@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from fastapi import APIRouter
+from fastapi.responses import FileResponse
+
+from app.errors import ClipFetchError, InvalidUrlError, to_http_exception
+from app.models import AnalyzeRequest, DownloadRequest, DownloadStatus, VideoMetadata
+from app.services.downloader import DownloadService
+from app.services.extractor import ExtractorService
+
+router = APIRouter()
+extractor = ExtractorService()
+downloader = DownloadService()
+
+
+@router.post("/api/analyze", response_model=VideoMetadata)
+async def analyze(payload: AnalyzeRequest) -> VideoMetadata:
+    try:
+        return await extractor.analyze_url(payload.url)
+    except ClipFetchError as exc:
+        raise to_http_exception(exc)
+    except ValueError as exc:
+        raise to_http_exception(InvalidUrlError(str(exc)))
+
+
+@router.post("/api/download")
+async def create_download(payload: DownloadRequest) -> dict[str, str]:
+    try:
+        job = downloader.create_job(payload.url, payload.format_id, payload.filename_preference)
+        downloader.start(job)
+        return {"job_id": job.id, "status": job.status}
+    except ClipFetchError as exc:
+        raise to_http_exception(exc)
+    except ValueError as exc:
+        raise to_http_exception(InvalidUrlError(str(exc)))
+
+
+@router.get("/api/download/{job_id}/status", response_model=DownloadStatus)
+async def get_status(job_id: str) -> DownloadStatus:
+    try:
+        return downloader.get_status(job_id)
+    except ClipFetchError as exc:
+        raise to_http_exception(exc)
+
+
+@router.get("/api/download/{job_id}/file")
+async def get_file(job_id: str):
+    try:
+        file_path = downloader.get_file_path(job_id)
+        return FileResponse(file_path, filename=file_path.name, media_type="application/octet-stream")
+    except ClipFetchError as exc:
+        raise to_http_exception(exc)
