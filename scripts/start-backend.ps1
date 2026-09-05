@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [int]$Port = 8000,
-    [string]$FrontendOrigin = "http://localhost:3000"
+    [string]$FrontendOrigin = "http://localhost:3000,http://127.0.0.1:3000"
 )
 
 $ErrorActionPreference = "Stop"

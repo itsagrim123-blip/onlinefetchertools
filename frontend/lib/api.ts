@@ -1,5 +1,6 @@
 export type VideoFormat = {
   format_id: string;
+  language?: string | null;
   resolution?: string | null;
   ext: string;
   filesize?: number | null;

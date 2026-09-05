@@ -69,6 +69,7 @@ class ExtractorService:
             formats.append(
                 VideoFormat(
                     format_id=str(format_id),
+                    language=str(entry.get("language")) if entry.get("language") else None,
                     resolution=str(resolution) if resolution is not None else None,
                     ext=str(entry.get("ext") or "mp4"),
                     filesize=int(filesize) if filesize is not None else None,

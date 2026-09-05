@@ -13,6 +13,7 @@ class AnalyzeRequest(BaseModel):
 
 class VideoFormat(BaseModel):
     format_id: str
+    language: str | None = None
     resolution: str | None = None
     ext: str = "mp4"
     filesize: int | None = None

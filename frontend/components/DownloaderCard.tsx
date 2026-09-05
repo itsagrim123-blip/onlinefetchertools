@@ -1,8 +1,23 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, Download, Loader2, Sparkles, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  Download,
+  Languages,
+  Loader2,
+  Music2,
+  Search,
+  Sparkles,
+  Subtitles,
+  Trash2,
+  Video,
+} from "lucide-react";
 import { analyzeUrl, createDownload, getDownloadFileUrl, getDownloadStatus, type VideoMetadata } from "@/lib/api";
+
+type DownloadTab = "video" | "audio" | "subtitles";
 
 export function DownloaderCard() {
   const [url, setUrl] = useState("");
@@ -15,19 +30,33 @@ export function DownloaderCard() {
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [downloadInfo, setDownloadInfo] = useState<{ downloaded_size?: string | null; speed?: string | null; eta?: string | null; filename?: string | null } | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [activeTab, setActiveTab] = useState<DownloadTab>("video");
+  const [languageQuery, setLanguageQuery] = useState("");
 
   const canSubmit = url.trim().length > 0 && !loading;
 
-  const formatCards = useMemo(() => {
-    if (!metadata) return [];
-
-    return metadata.formats.map((format) => ({
-      id: format.format_id,
-      label: format.resolution ? format.resolution : format.type === "audio" ? "Audio only" : "Format",
-      description: `${format.ext.toUpperCase()} • ${format.type}`,
-      available: true,
-    }));
+  const formatGroups = useMemo(() => {
+    const formats = metadata?.formats ?? [];
+    return {
+      video: formats.filter((format) => format.type === "video"),
+      audio: formats.filter((format) => format.type === "audio"),
+    };
   }, [metadata]);
+
+  const activeFormats = activeTab === "video" ? formatGroups.video : formatGroups.audio;
+  const languageOptions = useMemo(() => {
+    const labels = activeFormats.map((format) => format.language || format.quality_label || format.resolution || "Original");
+    return Array.from(new Set(labels)).slice(0, 24);
+  }, [activeFormats]);
+  const filteredLanguages = languageOptions.filter((language) => language.toLowerCase().includes(languageQuery.toLowerCase()));
+
+  const selectTab = (tab: DownloadTab) => {
+    setActiveTab(tab);
+    setLanguageQuery("");
+    if (tab === "subtitles") return;
+    const nextFormat = tab === "video" ? formatGroups.video[0] : formatGroups.audio[0];
+    setSelectedFormat(nextFormat?.format_id ?? "");
+  };
 
   useEffect(() => {
     if (!jobId || !isDownloading) return;
@@ -74,8 +103,12 @@ export function DownloaderCard() {
 
     try {
       const result = await analyzeUrl(url);
+      const initialTab: DownloadTab = result.formats.some((format) => format.type === "video") ? "video" : "audio";
+      const initialFormat = result.formats.find((format) => format.type === initialTab) ?? result.formats[0];
       setMetadata(result);
-      setSelectedFormat(result.formats[0]?.format_id ?? "");
+      setSelectedFormat(initialFormat?.format_id ?? "");
+      setActiveTab(initialTab);
+      setLanguageQuery("");
       setStatus("Ready to download");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to analyze this URL.");
@@ -158,46 +191,69 @@ export function DownloaderCard() {
         )}
 
         {metadata && (
-          <div className="mt-8 grid gap-6 lg:grid-cols-[220px_1fr]">
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
-              <img src={metadata.thumbnail ?? ""} alt={metadata.title} className="h-40 w-full object-cover" />
-            </div>
-
-            <div className="space-y-4">
-              <div>
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-slate-950/60 sm:h-24 sm:w-40">
+                <img src={metadata.thumbnail ?? ""} alt={metadata.title} className="h-full w-full object-cover" />
+              </div>
+              <div className="min-w-0">
                 <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Metadata</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">{metadata.title}</h2>
-              </div>
-
-              <div className="flex flex-wrap gap-3 text-sm text-slate-300">
-                {metadata.duration ? <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">{Math.floor(metadata.duration / 60)} min</span> : null}
-                {metadata.uploader ? <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">{metadata.uploader}</span> : null}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {formatCards.map((format) => {
-                  const isSelected = selectedFormat === format.id;
-                  return (
-                    <button
-                      key={format.id}
-                      type="button"
-                      onClick={() => setSelectedFormat(format.id)}
-                      className={`rounded-2xl border p-3 text-left transition ${
-                        isSelected
-                          ? "border-cyan-400/60 bg-cyan-500/10 shadow-lg shadow-cyan-500/10"
-                          : "border-white/10 bg-slate-950/40 hover:border-white/20 hover:bg-white/5"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium text-white">{format.label}</p>
-                        {isSelected && <CheckCircle2 className="h-4 w-4 text-cyan-300" />}
-                      </div>
-                      <p className="mt-1 text-xs text-slate-400">{format.description}</p>
-                    </button>
-                  );
-                })}
+                <h2 className="mt-1 truncate text-xl font-semibold text-white sm:text-2xl">{metadata.title}</h2>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
+                  {metadata.duration ? <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">{Math.floor(metadata.duration / 60)} min</span> : null}
+                  {metadata.uploader ? <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">{metadata.uploader}</span> : null}
+                </div>
               </div>
             </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {([
+                ["video", "Video (MP4)", "Download video with audio", Video],
+                ["audio", "Audio (MP3)", "Download audio only", Music2],
+                ["subtitles", "Subtitles (SRT)", "Download subtitles", Subtitles],
+              ] as const).map(([tab, label, description, Icon]) => {
+                const isActive = activeTab === tab;
+                const isDisabled = tab === "subtitles";
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => selectTab(tab)}
+                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+                      isActive ? "border-cyan-400 bg-cyan-500/10 shadow-lg shadow-cyan-500/10" : "border-white/10 bg-slate-950/40 hover:border-white/20 hover:bg-white/5"
+                    } ${isDisabled ? "cursor-not-allowed opacity-50" : ""}`}
+                  >
+                    <Icon className={`h-5 w-5 shrink-0 ${isActive ? "text-cyan-300" : "text-slate-400"}`} />
+                    <span className="min-w-0"><span className="block text-sm font-semibold text-white">{label}</span><span className="mt-1 block text-[11px] text-slate-400">{description}</span></span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeTab === "subtitles" ? (
+              <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/40 p-5 text-center text-sm text-slate-400">Subtitles are not available for this video.</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white"><Languages className="h-4 w-4 text-cyan-300" /> Select Language</div>
+                  <label className="relative block sm:w-52"><Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" /><input value={languageQuery} onChange={(event) => setLanguageQuery(event.target.value)} placeholder="Search language..." className="h-9 w-full rounded-lg border border-white/10 bg-slate-950/60 pl-9 pr-3 text-xs text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/60" aria-label="Search language" /></label>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  {filteredLanguages.map((language, index) => {
+                    const format = activeFormats[index % Math.max(activeFormats.length, 1)];
+                    const isSelected = format?.format_id === selectedFormat;
+                    return <button key={`${language}-${index}`} type="button" onClick={() => format && setSelectedFormat(format.format_id)} className={`flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-xs transition ${isSelected ? "border-cyan-400 bg-cyan-500/10 text-white" : "border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:bg-white/5"}`}><span className="truncate">{language}</span>{isSelected ? <Check className="h-3.5 w-3.5 shrink-0 text-cyan-300" /> : null}</button>;
+                  })}
+                </div>
+                {!filteredLanguages.length ? <p className="text-xs text-slate-500">No matching formats found.</p> : null}
+              </div>
+            )}
+
+            <button type="button" onClick={handleDownload} disabled={!metadata || !selectedFormat || loading || isDownloading || activeTab === "subtitles"} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">
+              {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {isDownloading ? "Preparing download..." : activeTab === "audio" ? "Download Audio (MP3)" : "Download Video (MP4)"}
+            </button>
           </div>
         )}
 
@@ -216,17 +272,7 @@ export function DownloaderCard() {
               <Download className="mr-2 h-4 w-4" />
               Download file
             </a>
-          ) : (
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={!metadata || !selectedFormat || loading || isDownloading}
-              className="inline-flex h-12 items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloading ? "Downloading" : "Download"}
-            </button>
-          )}
+          ) : null}
         </div>
 
         {(isDownloading || status === "complete" || status === "failed") && (
