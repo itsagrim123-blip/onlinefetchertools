@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 
 def validate_url(raw_url: str) -> str:
@@ -29,10 +29,10 @@ def validate_url(raw_url: str) -> str:
 
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
-            raise ValueError("Unsupported URL")
     except ValueError:
-        pass
+        ip = None
+    if ip and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved):
+        raise ValueError("Unsupported URL")
 
     if re.search(r"(?:^|\.)localhost($|\.)", hostname):
         raise ValueError("Unsupported URL")
@@ -40,6 +40,22 @@ def validate_url(raw_url: str) -> str:
     if not re.match(r"^[A-Za-z0-9.-]+(\.[A-Za-z0-9.-]+)+(:\d+)?(/.*)?$", parsed.netloc):
         raise ValueError("Invalid URL")
 
+    return normalize_youtube_url(value)
+
+
+def normalize_youtube_url(value: str) -> str:
+    parsed = urlparse(value)
+    hostname = (parsed.hostname or "").lower()
+    if hostname in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+        video_id = parse_qs(parsed.query).get("v", [None])[0]
+        if parsed.path.startswith("/shorts/"):
+            video_id = parsed.path.split("/", 2)[2].split("/", 1)[0]
+        if video_id:
+            return f"https://www.youtube.com/watch?v={video_id}"
+    if hostname in {"youtu.be", "www.youtu.be"}:
+        video_id = parsed.path.strip("/").split("/", 1)[0]
+        if video_id:
+            return f"https://www.youtube.com/watch?v={video_id}"
     return value
 
 

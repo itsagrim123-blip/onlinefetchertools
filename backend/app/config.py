@@ -32,6 +32,10 @@ class Settings(BaseSettings):
         path.mkdir(parents=True, exist_ok=True)
         return path
 
+    @property
+    def frontend_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.frontend_origin.split(",") if origin.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:

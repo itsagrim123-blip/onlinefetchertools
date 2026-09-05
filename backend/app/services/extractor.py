@@ -16,9 +16,11 @@ logger = logging.getLogger(__name__)
 
 class ExtractorService:
     async def analyze_url(self, url: str) -> VideoMetadata:
+        logger.info("URL validation started")
         validated_url = validate_url(url)
         if not self._looks_like_supported_site(validated_url):
             raise UnsupportedUrlError("Unsupported URL")
+        logger.info("URL validation completed for %s", validated_url)
 
         ydl_opts = {
             "quiet": True,
@@ -32,10 +34,11 @@ class ExtractorService:
         }
 
         try:
+            logger.info("yt-dlp metadata extraction started for %s", validated_url)
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(validated_url, download=False)
         except Exception as exc:
-            logger.exception("Metadata extraction failed")
+            logger.exception("yt-dlp metadata extraction failed for %s", validated_url)
             raise ClipFetchError("Video unavailable", status_code=404) from exc
 
         if not info:
@@ -86,7 +89,7 @@ class ExtractorService:
                 )
             ]
 
-        return VideoMetadata(
+        metadata = VideoMetadata(
             success=True,
             id=str(info.get("id") or "meta-1"),
             title=str(info.get("title") or "Untitled media"),
@@ -95,6 +98,8 @@ class ExtractorService:
             uploader=info.get("uploader") or info.get("channel") or info.get("channel_id"),
             formats=formats,
         )
+        logger.info("yt-dlp metadata extraction completed for %s with %d formats", validated_url, len(formats))
+        return metadata
 
     @staticmethod
     def _looks_like_supported_site(url: str) -> bool:

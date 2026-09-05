@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
@@ -9,17 +11,23 @@ from app.services.downloader import DownloadService
 from app.services.extractor import ExtractorService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 extractor = ExtractorService()
 downloader = DownloadService()
 
 
 @router.post("/api/analyze", response_model=VideoMetadata)
 async def analyze(payload: AnalyzeRequest) -> VideoMetadata:
+    logger.info("Analyze request received")
     try:
-        return await extractor.analyze_url(payload.url)
+        result = await extractor.analyze_url(payload.url)
+        logger.info("Analyze response generated for %s", result.id)
+        return result
     except ClipFetchError as exc:
+        logger.warning("Analyze request failed: %s", exc.message)
         raise to_http_exception(exc)
     except ValueError as exc:
+        logger.warning("Analyze URL validation failed: %s", exc)
         raise to_http_exception(InvalidUrlError(str(exc)))
 
 

@@ -17,7 +17,7 @@ cleanup_service = CleanupService()
 app = FastAPI(title="ClipFetch", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
+    allow_origins=settings.frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,8 +25,3 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(media_router)
-
-
-@app.get("/api/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "ClipFetch"}

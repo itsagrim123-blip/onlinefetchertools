@@ -139,10 +139,19 @@ On PowerShell:
 Copy-Item .env.example .env
 ```
 
+For the Next.js app, copy `frontend/.env.example` to `frontend/.env.local`. The frontend variable is public by design because it is embedded in browser JavaScript.
+
 Core variables:
 
 - `BACKEND_PORT=8000`
 - `FRONTEND_ORIGIN=http://localhost:3000`
+- `NEXT_PUBLIC_API_URL=http://localhost:8000` (set this in Vercel to the deployed backend URL)
+
+For production, set these values in the separate deployments:
+
+- Vercel: `NEXT_PUBLIC_API_URL=https://<your-backend-domain>`
+- Backend: `FRONTEND_ORIGIN=https://<your-vercel-domain>`
+- Backend container: keep FFmpeg installed by using `backend/Dockerfile`; `yt-dlp` is installed from `backend/requirements.txt`.
 - `MAX_DOWNLOAD_SIZE_MB=2048`
 - `MAX_CONCURRENT_DOWNLOADS=2`
 - `TEMP_FILE_RETENTION_MINUTES=30`
@@ -180,7 +189,7 @@ FastAPI automatically exposes Swagger UI at:
 
 ## Troubleshooting
 
-- If API calls fail, verify backend is running on port 8000.
+- If API calls fail, verify `NEXT_PUBLIC_API_URL` is set in the frontend build environment and points to the browser-reachable backend URL. Do not use the Docker-only hostname `backend` in this variable.
 - If FFmpeg errors occur, confirm the binary is on PATH.
 - If downloads are blocked, confirm the URL is supported and permitted.
 - If cross-origin errors appear, verify `FRONTEND_ORIGIN` matches your app origin.

@@ -51,23 +51,44 @@ export type DownloadStatus = {
 };
 
 export type ApiError = {
-  detail: string;
+  detail?: string | Array<{ msg?: string }>;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+
+function getApiUrl(path: string): string {
+  if (!API_BASE_URL) {
+    throw new Error("ClipFetch API URL is not configured. Set NEXT_PUBLIC_API_URL.");
+  }
+  return `${API_BASE_URL}${path}`;
+}
+
+function getApiErrorMessage(errorBody: ApiError): string {
+  if (typeof errorBody.detail === "string") return errorBody.detail;
+  if (Array.isArray(errorBody.detail)) {
+    return errorBody.detail.map((error) => error.msg).filter(Boolean).join(", ") || "Request failed";
+  }
+  return "Request failed";
+}
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const apiUrl = getApiUrl(path);
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new Error("Unable to reach the ClipFetch backend. Check the API URL and backend status.");
+  }
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({ detail: "Request failed" }))) as ApiError;
-    throw new Error(errorBody.detail ?? "Request failed");
+    throw new Error(getApiErrorMessage(errorBody));
   }
 
   return response.json() as Promise<T>;
@@ -92,5 +113,5 @@ export async function getDownloadStatus(jobId: string): Promise<DownloadStatus> 
 }
 
 export function getDownloadFileUrl(jobId: string): string {
-  return `${API_BASE_URL}/api/download/${jobId}/file`;
+  return getApiUrl(`/api/download/${jobId}/file`);
 }

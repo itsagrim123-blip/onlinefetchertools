@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, Download, Loader2, Play, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { analyzeUrl, createDownload, getDownloadFileUrl, getDownloadStatus, type VideoMetadata } from "@/lib/api";
 
 export function DownloaderCard() {
@@ -30,13 +30,6 @@ export function DownloaderCard() {
   }, [metadata]);
 
   useEffect(() => {
-    if (!metadata || !formatCards.length) return;
-    if (!selectedFormat) {
-      setSelectedFormat(formatCards[0].id);
-    }
-  }, [metadata, formatCards, selectedFormat]);
-
-  useEffect(() => {
     if (!jobId || !isDownloading) return;
 
     const interval = setInterval(async () => {
@@ -58,7 +51,7 @@ export function DownloaderCard() {
           }
           clearInterval(interval);
         }
-      } catch (pollError) {
+      } catch {
         setError("Unable to fetch download status.");
         setIsDownloading(false);
         clearInterval(interval);
@@ -82,6 +75,7 @@ export function DownloaderCard() {
     try {
       const result = await analyzeUrl(url);
       setMetadata(result);
+      setSelectedFormat(result.formats[0]?.format_id ?? "");
       setStatus("Ready to download");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to analyze this URL.");
