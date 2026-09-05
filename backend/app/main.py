@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 import logging
 
 from fastapi import FastAPI
@@ -12,9 +14,17 @@ from app.services.cleanup import CleanupService
 
 logging.basicConfig(level=logging.INFO)
 settings = get_settings()
-cleanup_service = CleanupService()
 
-app = FastAPI(title="ClipFetch", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    cleanup_service = CleanupService()
+    try:
+        yield
+    finally:
+        cleanup_service.stop()
+
+app = FastAPI(title="ClipFetch", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.frontend_origins,

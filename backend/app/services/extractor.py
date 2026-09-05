@@ -5,8 +5,6 @@ from pathlib import Path
 from tempfile import mkdtemp
 from urllib.parse import urlparse
 
-import yt_dlp
-
 from app.errors import ClipFetchError, UnsupportedUrlError
 from app.models import VideoFormat, VideoMetadata
 from app.utils.validation import sanitize_filename, validate_url
@@ -34,6 +32,8 @@ class ExtractorService:
         }
 
         try:
+            import yt_dlp
+
             logger.info("yt-dlp metadata extraction started for %s", validated_url)
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(validated_url, download=False)

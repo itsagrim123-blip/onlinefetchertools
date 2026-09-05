@@ -164,6 +164,46 @@ docker compose up --build
 
 This starts both the frontend and backend containers. The frontend is served on http://localhost:3000 and the backend on http://localhost:8000.
 
+## Deployment Architecture
+
+The frontend is deployed to Vercel. The FastAPI backend must not be deployed as a Vercel Serverless Function. It is a persistent Docker service because it runs yt-dlp, FFmpeg, background download jobs, progress tracking, and cleanup.
+
+Local:
+
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+
+Production:
+
+- Frontend: Vercel
+- Backend: a separate Docker-compatible VPS, VM, or container host
+
+### Deploy the Backend to a Docker-Compatible Server
+
+1. Install Docker Engine and Docker Compose on the server.
+2. Clone this repository and enter its directory.
+3. Build the backend image:
+
+	```bash
+	docker build -t clipfetch-backend ./backend
+	```
+
+4. Start the backend, replacing the frontend origin with the real Vercel origin:
+
+	```bash
+	docker run -d --name clipfetch-backend --restart unless-stopped \
+	  -p 8000:8000 \
+	  -e FRONTEND_ORIGIN=https://your-app.vercel.app \
+	  -v clipfetch-downloads:/app/downloads \
+	  clipfetch-backend
+	```
+
+5. Put HTTPS in front of port 8000 with the server's reverse proxy or managed load balancer.
+6. Verify `https://your-backend-domain.example.com/api/health` returns HTTP 200.
+7. Set the Vercel environment variable `NEXT_PUBLIC_API_URL` to that HTTPS backend URL and redeploy the frontend.
+
+The backend image installs Python 3.12, FastAPI, Uvicorn, yt-dlp, and FFmpeg. It starts with `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+
 ## API Documentation
 
 FastAPI automatically exposes Swagger UI at:
@@ -178,6 +218,8 @@ FastAPI automatically exposes Swagger UI at:
 - `POST /api/download`
 - `GET /api/download/{job_id}/status`
 - `GET /api/download/{job_id}/file`
+
+The health response reports API, yt-dlp, and FFmpeg availability without exposing secrets or filesystem paths.
 
 ## Development Workflow
 

@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-import yt_dlp
-
 from app.config import get_settings
 from app.errors import ClipFetchError, DownloadFailedError, JobNotFoundError
 from app.models import DownloadJob, DownloadStatus
@@ -94,6 +92,8 @@ class DownloadService:
 
     def _run_download(self, job: DownloadJob) -> None:
         try:
+            import yt_dlp
+
             job.status = "queued"
             self.store.update(job)
             os.makedirs(job.temp_dir or get_settings().download_path, exist_ok=True)
