@@ -9,9 +9,8 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 python-dotenv==1.2.3
 Jinja2==3.1.6
-email-validator==2.3.0
-ffmpeg-python==0.2.0
 Pillow==11.3.0
 pypdf==6.0.0
 PyMuPDF==1.26.4
 pillow-heif==1.6.0
+

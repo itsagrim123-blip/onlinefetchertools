@@ -53,17 +53,17 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.13),_transparent_34%),linear-gradient(180deg,#020817_0%,#0f172a_100%)] text-slate-100">
-      <div className="mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-6 sm:pb-20 sm:pt-10 lg:px-8">
         <div className="flex items-center justify-between">
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-cyan-300">
             <ChevronLeft className="h-4 w-4" /> All tools
           </Link>
           <BackendStatus />
         </div>
-        <div className="mx-auto max-w-4xl pb-10 pt-16 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Online Fetcher Tools utility</p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white sm:text-5xl">{title}</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-400">
+        <div className="mx-auto max-w-4xl pb-6 pt-6 text-center sm:pb-10 sm:pt-16">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Online Fetcher Tools utility</p>
+          <h1 className="mt-2 sm:mt-4 text-2xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">{title}</h1>
+          <p className="mx-auto mt-2 sm:mt-4 max-w-2xl text-xs sm:text-base leading-5 sm:leading-7 text-slate-400">
             {isYoutube
               ? "Analyze a public YouTube URL, choose a format, and download content you are permitted to use."
               : isVideoEditor

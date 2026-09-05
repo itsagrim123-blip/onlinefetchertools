@@ -142,19 +142,19 @@ export function PdfPageManagerWorkspace() {
   };
 
   return (
-    <section className="mx-auto max-w-5xl px-4 pb-20 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
+    <section className="mx-auto max-w-5xl px-4 pb-16 sm:pb-20 sm:px-6 lg:px-8">
+      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
         {!file ? (
           <label
             onDrop={onDrop}
             onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
           >
             <input type="file" className="sr-only" accept=".pdf" onChange={onChoose} />
-            <UploadCloud className="h-10 w-10 text-cyan-300" />
-            <h2 className="mt-4 text-xl font-semibold text-white">Choose a PDF to manage pages</h2>
-            <p className="mt-2 text-sm text-slate-400">Drag &amp; drop or click to upload your document</p>
-            <span className="mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs text-slate-400">
+            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
+            <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">Choose a PDF to manage pages</h2>
+            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">Drag &amp; drop or click to upload your document</p>
+            <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-400">
               Visual previews · Reorder · Delete · Export
             </span>
           </label>
@@ -206,7 +206,7 @@ export function PdfPageManagerWorkspace() {
                 <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-cyan-300">
                   Drag pages or use arrows to reorder · Click trash to delete
                 </p>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                   {pages.map((page, idx) => (
                     <div
                       key={`page-${page.originalIndex}-${idx}`}
@@ -214,14 +214,14 @@ export function PdfPageManagerWorkspace() {
                       onDragStart={() => handleDragStart(idx)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDropOnPage(idx)}
-                      className={`group relative flex flex-col items-center rounded-2xl border p-3 transition duration-200 ${
+                      className={`group relative flex flex-col items-center rounded-2xl border p-2.5 sm:p-3 transition duration-200 ${
                         draggedIndex === idx
                           ? "border-cyan-400 bg-cyan-400/10 opacity-50 scale-95"
                           : "border-white/10 bg-slate-950/70 hover:border-cyan-400/40 hover:bg-cyan-400/[0.04]"
                       }`}
                     >
                       {/* Drag handle */}
-                      <div className="absolute top-2 left-2 cursor-grab text-slate-500 group-hover:text-cyan-300">
+                      <div className="absolute top-2 left-2 cursor-grab text-slate-500 group-hover:text-cyan-300 p-1">
                         <GripVertical className="h-4 w-4" />
                       </div>
 
@@ -230,13 +230,13 @@ export function PdfPageManagerWorkspace() {
                         type="button"
                         onClick={() => deletePage(idx)}
                         title="Delete page"
-                        className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-red-400/10 text-red-300 hover:bg-red-400/20 transition"
+                        className="absolute top-1.5 right-1.5 flex h-7 w-7 sm:h-6 sm:w-6 items-center justify-center rounded-md bg-red-400/10 text-red-300 hover:bg-red-400/20 transition"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
 
                       {/* Thumbnail or fallback */}
-                      <div className="my-6 flex h-36 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-900 border border-white/5">
+                      <div className="my-4 sm:my-6 flex h-28 sm:h-36 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-900 border border-white/5">
                         {page.thumbnail ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -245,7 +245,7 @@ export function PdfPageManagerWorkspace() {
                             className="h-full w-full object-contain pointer-events-none"
                           />
                         ) : (
-                          <FileText className="h-10 w-10 text-slate-600" />
+                          <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-slate-600" />
                         )}
                       </div>
 
@@ -256,9 +256,9 @@ export function PdfPageManagerWorkspace() {
                           disabled={idx === 0}
                           onClick={() => movePage(idx, idx - 1)}
                           title="Move left"
-                          className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent"
+                          className="flex h-8 w-8 sm:h-6 sm:w-6 items-center justify-center rounded text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent"
                         >
-                          <ArrowLeft className="h-3 w-3" />
+                          <ArrowLeft className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
                         </button>
                         <span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[11px] font-mono font-medium text-cyan-300">
                           P.{page.originalIndex}
@@ -268,9 +268,9 @@ export function PdfPageManagerWorkspace() {
                           disabled={idx === pages.length - 1}
                           onClick={() => movePage(idx, idx + 1)}
                           title="Move right"
-                          className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent"
+                          className="flex h-8 w-8 sm:h-6 sm:w-6 items-center justify-center rounded text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent"
                         >
-                          <ArrowRight className="h-3 w-3" />
+                          <ArrowRight className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
                         </button>
                       </div>
                     </div>
@@ -305,7 +305,7 @@ export function PdfPageManagerWorkspace() {
 
             {/* Result */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-5 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
                 <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Your PDF is ready!</p>
@@ -313,18 +313,18 @@ export function PdfPageManagerWorkspace() {
                     {result.name} · {formatSize(result.size)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
                   >
                     <Download className="h-4 w-4" /> Download
                   </a>
                   <button
                     type="button"
                     onClick={() => setResult(null)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     Manage more
                   </button>

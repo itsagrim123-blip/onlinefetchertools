@@ -2,21 +2,22 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 
 from app.errors import ClipFetchError, InvalidUrlError, to_http_exception
 from app.models import AnalyzeRequest, DownloadRequest, DownloadStatus, VideoMetadata
-from app.services.downloader import DownloadService
+from app.services.downloader import DownloadService, get_download_service
 from app.services.extractor import ExtractorService
+from app.utils.rate_limit import rate_limit_analyze, rate_limit_download
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 extractor = ExtractorService()
-downloader = DownloadService()
+downloader = get_download_service()
 
 
-@router.post("/api/analyze", response_model=VideoMetadata)
+@router.post("/api/analyze", response_model=VideoMetadata, dependencies=[Depends(rate_limit_analyze)])
 async def analyze(payload: AnalyzeRequest) -> VideoMetadata:
     logger.info("Analyze request received")
     try:
@@ -31,7 +32,7 @@ async def analyze(payload: AnalyzeRequest) -> VideoMetadata:
         raise to_http_exception(InvalidUrlError(str(exc)))
 
 
-@router.post("/api/download")
+@router.post("/api/download", dependencies=[Depends(rate_limit_download)])
 async def create_download(payload: DownloadRequest) -> dict[str, str]:
     try:
         job = downloader.create_job(

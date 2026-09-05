@@ -110,14 +110,14 @@ export function FileToolWorkspace({ slug }: { slug: string }) {
   };
 
   return (
-    <section className="mx-auto max-w-4xl px-4 pb-20 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
-        <label onDrop={onDrop} onDragOver={(event) => event.preventDefault()} className="flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]">
+    <section className="mx-auto max-w-4xl px-4 pb-16 sm:pb-20 sm:px-6 lg:px-8">
+      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
+        <label onDrop={onDrop} onDragOver={(event) => event.preventDefault()} className="flex min-h-48 sm:min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]">
           <input type="file" className="sr-only" accept={config.accept} multiple={config.multiple} onChange={onChoose} />
-          <UploadCloud className="h-9 w-9 text-cyan-300" />
-          <h2 className="mt-4 text-lg font-semibold text-white">Drop your file{config.multiple ? "s" : ""} here</h2>
-          <p className="mt-2 text-sm text-slate-400">or click to choose {config.multiple ? "files" : "a file"}</p>
-          <span className="mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs text-slate-500">
+          <UploadCloud className="h-8 w-8 sm:h-9 sm:w-9 text-cyan-300" />
+          <h2 className="mt-3 sm:mt-4 text-base sm:text-lg font-semibold text-white">Drop your file{config.multiple ? "s" : ""} here</h2>
+          <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">or click to choose {config.multiple ? "files" : "a file"}</p>
+          <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-500 break-all max-w-full">
             {config.accept === "*/*" ? "All files supported" : config.accept.replaceAll(",", " · ")}
           </span>
         </label>
@@ -213,12 +213,14 @@ export function FileToolWorkspace({ slug }: { slug: string }) {
               <p className="text-sm font-semibold text-white">Ready to download</p>
               <p className="truncate text-xs text-slate-400">{result.name} · {formatSize(result.size)}</p>
             </div>
-            <a href={result.url} download={result.name} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition">
-              <Download className="h-4 w-4" /> Download
-            </a>
-            <button type="button" onClick={() => { setFiles([]); setResult(null); setTextPreview(null); }} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm text-slate-300 hover:bg-white/10">
-              <RotateCcw className="h-4 w-4" /> Another
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+              <a href={result.url} download={result.name} className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition">
+                <Download className="h-4 w-4" /> Download
+              </a>
+              <button type="button" onClick={() => { setFiles([]); setResult(null); setTextPreview(null); }} className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm text-slate-300 hover:bg-white/10">
+                <RotateCcw className="h-4 w-4" /> Another
+              </button>
+            </div>
           </div>
         )}
 
@@ -228,5 +230,12 @@ export function FileToolWorkspace({ slug }: { slug: string }) {
   );
 }
 
-function OptionRow({ label, children }: { label: string; children: ReactNode }) { return <label className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-slate-950/50 p-4 text-sm text-slate-300">{label}{children}</label>; }
+function OptionRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 rounded-xl border border-white/10 bg-slate-950/50 p-3.5 sm:p-4 text-sm text-slate-300">
+      <span className="shrink-0">{label}</span>
+      <div className="w-full sm:w-auto flex items-center">{children}</div>
+    </label>
+  );
+}
 function formatSize(bytes: number) { if (!bytes) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`; }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, UploadFile
@@ -18,7 +19,8 @@ from app.services.pdf_tools import (
     reorder_pages,
     split_pdf,
 )
-from app.utils.files import cleanup_work_dir, create_work_dir, save_upload, safe_upload_name
+from app.utils.concurrency import PDF_SEMAPHORE
+from app.utils.files import cleanup_work_dir, create_work_dir, safe_upload_name, save_upload
 
 router = APIRouter(prefix="/api/pdf", tags=["PDF tools"])
 PDF_EXTENSIONS = {".pdf"}
@@ -39,7 +41,8 @@ async def merge(files: list[UploadFile] = File(...)):
             await save_upload(upload, destination, PDF_EXTENSIONS)
             sources.append(destination)
         output = work_dir / "merged.pdf"
-        merge_pdfs(sources, output)
+        async with PDF_SEMAPHORE:
+            await asyncio.to_thread(merge_pdfs, sources, output)
         return result_file(work_dir, output, "application/pdf")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -52,7 +55,8 @@ async def split(file: UploadFile = File(...), ranges: str | None = Form(None)):
     try:
         source = work_dir / safe_upload_name(file.filename, "document.pdf")
         await save_upload(file, source, PDF_EXTENSIONS)
-        output = split_pdf(source, work_dir, ranges)
+        async with PDF_SEMAPHORE:
+            output = await asyncio.to_thread(split_pdf, source, work_dir, ranges)
         return result_file(work_dir, output, "application/zip")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -69,7 +73,8 @@ async def from_images(files: list[UploadFile] = File(...)):
             await save_upload(upload, destination, IMAGE_EXTENSIONS)
             sources.append(destination)
         output = work_dir / "images.pdf"
-        images_to_pdf(sources, output)
+        async with PDF_SEMAPHORE:
+            await asyncio.to_thread(images_to_pdf, sources, output)
         return result_file(work_dir, output, "application/pdf")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -88,7 +93,8 @@ async def compress(file: UploadFile = File(...)):
     try:
         source = await saved_pdf(file, work_dir)
         output = work_dir / "compressed.pdf"
-        compress_pdf(source, output)
+        async with PDF_SEMAPHORE:
+            await asyncio.to_thread(compress_pdf, source, output)
         return result_file(work_dir, output, "application/pdf")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -100,7 +106,9 @@ async def to_images(file: UploadFile = File(...), image_format: str = Form("png"
     work_dir = create_work_dir()
     try:
         source = await saved_pdf(file, work_dir)
-        output = pdf_to_images(source, work_dir, image_format if image_format in {"png", "jpg"} else "png")
+        target_fmt = image_format if image_format in {"png", "jpg"} else "png"
+        async with PDF_SEMAPHORE:
+            output = await asyncio.to_thread(pdf_to_images, source, work_dir, target_fmt)
         return result_file(work_dir, output, "application/zip")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -113,7 +121,8 @@ async def delete(file: UploadFile = File(...), pages: str = Form(...)):
     try:
         source = await saved_pdf(file, work_dir)
         output = work_dir / "pages-deleted.pdf"
-        delete_pages(source, output, pages)
+        async with PDF_SEMAPHORE:
+            await asyncio.to_thread(delete_pages, source, output, pages)
         return result_file(work_dir, output, "application/pdf")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -126,7 +135,8 @@ async def reorder(file: UploadFile = File(...), order: str = Form(...)):
     try:
         source = await saved_pdf(file, work_dir)
         output = work_dir / "pages-reordered.pdf"
-        reorder_pages(source, output, order)
+        async with PDF_SEMAPHORE:
+            await asyncio.to_thread(reorder_pages, source, output, order)
         return result_file(work_dir, output, "application/pdf")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -139,7 +149,8 @@ async def manage(file: UploadFile = File(...), order: str = Form(...)):
     try:
         source = await saved_pdf(file, work_dir)
         output = work_dir / "pages-managed.pdf"
-        manage_pages(source, output, order)
+        async with PDF_SEMAPHORE:
+            await asyncio.to_thread(manage_pages, source, output, order)
         return result_file(work_dir, output, "application/pdf")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -153,7 +164,8 @@ async def to_text(file: UploadFile = File(...)):
         source = await saved_pdf(file, work_dir)
         stem = Path(safe_upload_name(file.filename, "document")).stem
         output = work_dir / f"{stem}.txt"
-        pdf_to_text(source, output)
+        async with PDF_SEMAPHORE:
+            await asyncio.to_thread(pdf_to_text, source, output)
         return result_file(work_dir, output, "text/plain; charset=utf-8")
     except Exception:
         cleanup_work_dir(work_dir)
@@ -165,7 +177,8 @@ async def thumbnails(file: UploadFile = File(...)):
     work_dir = create_work_dir()
     try:
         source = await saved_pdf(file, work_dir)
-        thumbs = generate_pdf_thumbnails(source)
+        async with PDF_SEMAPHORE:
+            thumbs = await asyncio.to_thread(generate_pdf_thumbnails, source)
         cleanup_work_dir(work_dir)
         return JSONResponse({"page_count": len(thumbs), "thumbnails": thumbs})
     except Exception:

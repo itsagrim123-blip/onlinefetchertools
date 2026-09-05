@@ -152,34 +152,36 @@ export function DownloaderCard() {
               value={url}
               onChange={(event: ChangeEvent<HTMLInputElement>) => setUrl(event.target.value)}
               placeholder="Paste a supported video URL here"
-              className="h-14 flex-1 rounded-2xl border border-white/10 bg-slate-950/70 px-4 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30"
+              className="h-12 sm:h-14 flex-1 rounded-2xl border border-white/10 bg-slate-950/70 px-4 text-sm sm:text-base text-white outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30"
               aria-label="Video URL"
             />
-            <button
-              type="button"
-              onClick={() => setUrl("")}
-              className="inline-flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="ml-2">Clear</span>
-            </button>
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="inline-flex h-14 items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing
-                </>
-              ) : (
-                <>
-                  Analyze
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2 md:contents">
+              <button
+                type="button"
+                onClick={() => setUrl("")}
+                className="inline-flex h-12 sm:h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10 shrink-0"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="ml-2 hidden xs:inline sm:inline">Clear</span>
+              </button>
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="inline-flex h-12 sm:h-14 flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 md:flex-initial"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing
+                  </>
+                ) : (
+                  <>
+                    Analyze
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
 
@@ -239,7 +241,7 @@ export function DownloaderCard() {
                   <div className="flex items-center gap-2 text-sm font-medium text-white"><Languages className="h-4 w-4 text-cyan-300" /> Select Language</div>
                   <label className="relative block sm:w-52"><Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" /><input value={languageQuery} onChange={(event) => setLanguageQuery(event.target.value)} placeholder="Search language..." className="h-9 w-full rounded-lg border border-white/10 bg-slate-950/60 pl-9 pr-3 text-xs text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/60" aria-label="Search language" /></label>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
                   {filteredLanguages.map((language, index) => {
                     const format = activeFormats[index % Math.max(activeFormats.length, 1)];
                     const isSelected = format?.format_id === selectedFormat;
@@ -267,7 +269,7 @@ export function DownloaderCard() {
               href={finalDownloadUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-12 items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110"
+              className="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110"
             >
               <Download className="mr-2 h-4 w-4" />
               Download file
@@ -284,11 +286,11 @@ export function DownloaderCard() {
             <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
               <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-500" style={{ width: `${downloadProgress}%` }} />
             </div>
-            <div className="flex flex-wrap gap-4 text-xs text-slate-400">
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-400">
               {downloadInfo?.downloaded_size ? <span>Downloaded: {downloadInfo.downloaded_size}</span> : null}
               {downloadInfo?.speed ? <span>Speed: {downloadInfo.speed}</span> : null}
               {downloadInfo?.eta ? <span>ETA: {downloadInfo.eta}</span> : null}
-              {downloadInfo?.filename ? <span>File: {downloadInfo.filename}</span> : null}
+              {downloadInfo?.filename ? <span className="break-all">File: {downloadInfo.filename}</span> : null}
             </div>
           </div>
         )}

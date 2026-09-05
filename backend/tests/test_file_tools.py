@@ -130,7 +130,8 @@ def test_webp_image_conversion():
 
 
 def test_pdf_to_text_and_manage(tmp_path):
-    import fitz
+    import pytest
+    fitz = pytest.importorskip("fitz")
 
     doc = fitz.open()
     p1 = doc.new_page()

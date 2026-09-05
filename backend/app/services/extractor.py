@@ -1,8 +1,8 @@
-from __future__ import annotations
-
+import asyncio
 import logging
 from pathlib import Path
 from tempfile import mkdtemp
+from typing import Any
 from urllib.parse import urlparse
 
 from app.errors import ClipFetchError, UnsupportedUrlError
@@ -35,8 +35,12 @@ class ExtractorService:
             import yt_dlp
 
             logger.info("yt-dlp metadata extraction started for %s", validated_url)
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(validated_url, download=False)
+
+            def _extract() -> dict[str, Any]:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    return ydl.extract_info(validated_url, download=False)
+
+            info = await asyncio.to_thread(_extract)
         except Exception as exc:
             logger.exception("yt-dlp metadata extraction failed for %s", validated_url)
             raise ClipFetchError("Video unavailable", status_code=404) from exc

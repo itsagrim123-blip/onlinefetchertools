@@ -178,21 +178,21 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
   };
 
   return (
-    <section className="mx-auto max-w-4xl px-4 pb-20 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
+    <section className="mx-auto max-w-4xl px-4 pb-16 sm:pb-20 sm:px-6 lg:px-8">
+      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
         {!file ? (
           <label
             onDrop={onDrop}
             onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
           >
             <input type="file" className="sr-only" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/*" onChange={onChoose} />
-            <UploadCloud className="h-10 w-10 text-cyan-300" />
-            <h2 className="mt-4 text-xl font-semibold text-white">
+            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
+            <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">
               {isCropper ? "Choose an image to crop" : "Choose an image to rotate & flip"}
             </h2>
-            <p className="mt-2 text-sm text-slate-400">Drag &amp; drop or click to upload (JPG, PNG, WebP, HEIC)</p>
-            <span className="mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs text-slate-400">
+            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">Drag &amp; drop or click to upload (JPG, PNG, WebP, HEIC)</p>
+            <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-400">
               {isCropper ? "Precise cropping · Aspect ratios · Lossless export" : "90° / 180° / 270° · Horizontal & Vertical flip"}
             </span>
           </label>
@@ -258,7 +258,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                       key={ratio}
                       type="button"
                       onClick={() => applyAspectRatio(ratio)}
-                      className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold uppercase transition ${
+                      className={`flex-1 sm:flex-initial min-w-[56px] text-center rounded-xl px-3.5 py-1.5 text-xs font-semibold uppercase transition ${
                         aspectRatio === ratio
                           ? "bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/20"
                           : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-cyan-400/40"
@@ -270,7 +270,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                 </div>
 
                 {/* Coordinate inputs */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                   <label className="text-xs text-slate-400">
                     X offset
                     <input
@@ -331,28 +331,28 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                   <button
                     type="button"
                     onClick={() => setRotation((r) => (r + 90) % 360)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
+                    className="flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
                   >
                     <RotateCw className="h-3.5 w-3.5 text-cyan-300" /> Rotate 90° CW
                   </button>
                   <button
                     type="button"
                     onClick={() => setRotation((r) => (r + 270) % 360)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
+                    className="flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
                   >
                     <RotateCcw className="h-3.5 w-3.5 text-cyan-300" /> Rotate 90° CCW
                   </button>
                   <button
                     type="button"
                     onClick={() => setRotation((r) => (r + 180) % 360)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
+                    className="flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
                   >
                     <RotateCw className="h-3.5 w-3.5 text-cyan-300" /> Rotate 180°
                   </button>
                   <button
                     type="button"
                     onClick={() => setFlipH((f) => !f)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
+                    className={`flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
                       flipH
                         ? "border-cyan-400 bg-cyan-400/10 text-cyan-300"
                         : "border-white/10 bg-slate-900/60 text-slate-200 hover:border-cyan-400/40"
@@ -363,7 +363,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                   <button
                     type="button"
                     onClick={() => setFlipV((f) => !f)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
+                    className={`flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
                       flipV
                         ? "border-cyan-400 bg-cyan-400/10 text-cyan-300"
                         : "border-white/10 bg-slate-900/60 text-slate-200 hover:border-cyan-400/40"
@@ -433,7 +433,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
 
             {/* Result card */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-5 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
                 <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Your edited image is ready!</p>
@@ -441,18 +441,18 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                     {result.name} · {formatSize(result.size)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
                   >
                     <Download className="h-4 w-4" /> Download
                   </a>
                   <button
                     type="button"
                     onClick={() => setResult(null)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     Edit again
                   </button>

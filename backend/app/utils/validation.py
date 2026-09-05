@@ -59,6 +59,13 @@ def normalize_youtube_url(value: str) -> str:
     return value
 
 
+WINDOWS_RESERVED_NAMES = {
+    "CON", "PRN", "AUX", "NUL",
+    *(f"COM{i}" for i in range(1, 10)),
+    *(f"LPT{i}" for i in range(1, 10)),
+}
+
+
 def sanitize_filename(name: str | None, fallback: str = "download") -> str:
     original = (name or fallback).strip()
     if not original:
@@ -77,6 +84,8 @@ def sanitize_filename(name: str | None, fallback: str = "download") -> str:
             stem = stem.rstrip("_")
         if not stem:
             stem = fallback
+        if stem.upper() in WINDOWS_RESERVED_NAMES:
+            stem = f"file_{stem}"
         ext = ext.strip("._")
         if not ext:
             return stem.strip("._") or fallback
@@ -85,4 +94,6 @@ def sanitize_filename(name: str | None, fallback: str = "download") -> str:
     cleaned = base.strip("._") or fallback
     if path_traversal_count <= 1:
         cleaned = cleaned.rstrip("_")
+    if cleaned.upper() in WINDOWS_RESERVED_NAMES:
+        cleaned = f"file_{cleaned}"
     return cleaned

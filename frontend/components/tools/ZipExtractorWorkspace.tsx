@@ -86,19 +86,19 @@ export function ZipExtractorWorkspace() {
   const totalUncompressed = entries.reduce((acc, e) => acc + (e.is_dir ? 0 : e.size), 0);
 
   return (
-    <section className="mx-auto max-w-4xl px-4 pb-20 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
+    <section className="mx-auto max-w-4xl px-4 pb-16 sm:pb-20 sm:px-6 lg:px-8">
+      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
         {!file ? (
           <label
             onDrop={onDrop}
             onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
           >
             <input type="file" className="sr-only" accept=".zip" onChange={onChoose} />
-            <UploadCloud className="h-10 w-10 text-cyan-300" />
-            <h2 className="mt-4 text-xl font-semibold text-white">Choose a ZIP archive to inspect &amp; extract</h2>
-            <p className="mt-2 text-sm text-slate-400">Drag &amp; drop or click to upload your archive</p>
-            <span className="mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs text-slate-400">
+            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
+            <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">Choose a ZIP archive to inspect &amp; extract</h2>
+            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">Drag &amp; drop or click to upload your archive</p>
+            <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-400">
               Zip Slip protected · Safe extraction · File listing
             </span>
           </label>
@@ -145,17 +145,17 @@ export function ZipExtractorWorkspace() {
                   {entries.map((entry, idx) => (
                     <div
                       key={`${entry.name}-${idx}`}
-                      className="flex items-center justify-between px-4 py-2.5 text-xs transition hover:bg-white/[0.02]"
+                      className="flex items-center justify-between px-3.5 sm:px-4 py-2.5 text-xs transition hover:bg-white/[0.02]"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-4">
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2 sm:pr-4 flex-1">
                         {entry.is_dir ? (
                           <Folder className="h-4 w-4 text-cyan-400 shrink-0" />
                         ) : (
                           <File className="h-4 w-4 text-slate-400 shrink-0" />
                         )}
-                        <span className="truncate text-slate-200 font-mono text-[11px]">{entry.name}</span>
+                        <span className="truncate text-slate-200 font-mono text-[11px] min-w-0">{entry.name}</span>
                       </div>
-                      <span className="text-slate-500 font-mono shrink-0">
+                      <span className="text-slate-500 font-mono shrink-0 ml-2">
                         {entry.is_dir ? "folder" : formatSize(entry.size)}
                       </span>
                     </div>
@@ -190,7 +190,7 @@ export function ZipExtractorWorkspace() {
 
             {/* Result */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-5 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
                 <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Extracted successfully!</p>
@@ -198,18 +198,18 @@ export function ZipExtractorWorkspace() {
                     {result.name} · {formatSize(result.size)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
                   >
                     <Download className="h-4 w-4" /> Download
                   </a>
                   <button
                     type="button"
                     onClick={() => setResult(null)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     <RotateCcw className="h-4 w-4" /> Reset
                   </button>

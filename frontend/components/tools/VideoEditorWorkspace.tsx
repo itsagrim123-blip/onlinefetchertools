@@ -230,13 +230,13 @@ export function VideoEditorWorkspace() {
   const cutDuration = Math.max(0, endTime - startTime);
 
   return (
-    <section className="mx-auto max-w-4xl px-4 pb-20 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
+    <section className="mx-auto max-w-4xl px-4 pb-16 sm:pb-20 sm:px-6 lg:px-8">
+      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
         {!file ? (
           <label
             onDrop={onDrop}
             onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
           >
             <input
               type="file"
@@ -244,19 +244,19 @@ export function VideoEditorWorkspace() {
               accept=".mp4,.webm,.mov,.mkv,.avi,video/*"
               onChange={onChoose}
             />
-            <UploadCloud className="h-10 w-10 text-cyan-300" />
-            <h2 className="mt-4 text-xl font-semibold text-white">Choose a video file to edit</h2>
-            <p className="mt-2 text-sm text-slate-400">
+            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
+            <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">Choose a video file to edit</h2>
+            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">
               Drag &amp; drop or click to upload (MP4, WebM, MOV, MKV, AVI)
             </p>
-            <span className="mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs text-slate-400">
+            <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-400">
               Trim · Cut · Resize · Quality · Audio Preserved
             </span>
           </label>
         ) : (
           <div className="space-y-6">
             {/* File Info Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-3.5 sm:p-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300 border border-cyan-400/20">
                   <Film className="h-5 w-5" />
@@ -283,7 +283,7 @@ export function VideoEditorWorkspace() {
                 <video
                   ref={videoRef}
                   src={videoUrl}
-                  className="max-h-[380px] w-full object-contain"
+                  className="max-h-[240px] sm:max-h-[380px] w-full object-contain"
                   onLoadedMetadata={onLoadedMetadata}
                   onTimeUpdate={onTimeUpdate}
                   onEnded={() => setIsPlaying(false)}
@@ -307,7 +307,7 @@ export function VideoEditorWorkspace() {
             </div>
 
             {/* Interactive Timeline & Cut Scrubbing */}
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3.5 sm:p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">
                   <Scissors className="h-3.5 w-3.5" /> Trim &amp; Timeline Range
@@ -352,7 +352,7 @@ export function VideoEditorWorkspace() {
               {/* Start Time & End Time Controls */}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1.5">
                     <span className="text-xs font-medium text-slate-300">Start Time</span>
                     <button
                       type="button"
@@ -371,7 +371,7 @@ export function VideoEditorWorkspace() {
                 </div>
 
                 <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1.5">
                     <span className="text-xs font-medium text-slate-300">End Time</span>
                     <button
                       type="button"
@@ -392,7 +392,7 @@ export function VideoEditorWorkspace() {
             </div>
 
             {/* Playback Speed Changer */}
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3.5 sm:p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">
                   <Gauge className="h-3.5 w-3.5" /> Video Speed Changer
@@ -410,7 +410,7 @@ export function VideoEditorWorkspace() {
                       setSpeed(s);
                       if (videoRef.current) videoRef.current.playbackRate = s;
                     }}
-                    className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                    className={`flex-1 min-w-[50px] sm:flex-initial rounded-xl px-3 py-2 text-xs font-semibold transition text-center ${
                       speed === s
                         ? "bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-md shadow-cyan-400/20"
                         : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-cyan-400/40 hover:text-white"
@@ -500,68 +500,72 @@ export function VideoEditorWorkspace() {
                   Current: <span className="font-mono text-cyan-300">{formatSeconds(currentTime)}</span>
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-2 flex-1 w-full min-w-0">
                   <input
                     type="text"
                     placeholder="Seek e.g. 01:23 or 15.5"
                     value={targetTimestampInput}
                     onChange={(e) => setTargetTimestampInput(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-xs text-white placeholder:text-slate-600 font-mono"
+                    className="h-10 flex-1 min-w-0 rounded-xl border border-white/10 bg-slate-950 px-3 text-xs text-white placeholder:text-slate-600 font-mono"
                   />
                   <button
                     type="button"
                     onClick={handleSeekToCustomTimestamp}
-                    className="h-10 px-3 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-200 hover:bg-white/10"
+                    className="h-10 px-3 shrink-0 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-200 hover:bg-white/10"
                   >
                     Seek
                   </button>
                 </div>
-                <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950 p-1">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setFrameFormat("jpg")}
+                      className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
+                        frameFormat === "jpg" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      JPG
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFrameFormat("png")}
+                      className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
+                        frameFormat === "png" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      PNG
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setFrameFormat("jpg")}
-                    className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
-                      frameFormat === "jpg" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
-                    }`}
+                    onClick={handleCaptureFrame}
+                    className="inline-flex h-10 flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-cyan-400/20 px-4 text-xs font-semibold text-cyan-300 border border-cyan-400/30 hover:bg-cyan-400/30 transition"
                   >
-                    JPG
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFrameFormat("png")}
-                    className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
-                      frameFormat === "png" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    PNG
+                    <Camera className="h-3.5 w-3.5" /> Capture Frame
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCaptureFrame}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-cyan-400/20 px-4 text-xs font-semibold text-cyan-300 border border-cyan-400/30 hover:bg-cyan-400/30 transition"
-                >
-                  <Camera className="h-3.5 w-3.5" /> Capture Frame
-                </button>
               </div>
 
               {capturedFrame && (
-                <div className="flex items-center gap-3 rounded-xl border border-cyan-400/30 bg-cyan-400/[0.06] p-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={capturedFrame.url}
-                    alt="Captured frame preview"
-                    className="h-14 w-24 rounded-lg object-cover border border-white/10 shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-white">Frame Captured!</p>
-                    <p className="truncate text-[11px] text-slate-400">{capturedFrame.name}</p>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-xl border border-cyan-400/30 bg-cyan-400/[0.06] p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={capturedFrame.url}
+                      alt="Captured frame preview"
+                      className="h-14 w-24 rounded-lg object-cover border border-white/10 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-white">Frame Captured!</p>
+                      <p className="truncate text-[11px] text-slate-400">{capturedFrame.name}</p>
+                    </div>
                   </div>
                   <a
                     href={capturedFrame.url}
                     download={capturedFrame.name}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-400 px-3 text-xs font-semibold text-slate-950 hover:bg-emerald-300 transition shrink-0"
+                    className="inline-flex h-9 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg bg-emerald-400 px-3 text-xs font-semibold text-slate-950 hover:bg-emerald-300 transition shrink-0"
                   >
                     <Download className="h-3.5 w-3.5" /> Download
                   </a>
@@ -596,7 +600,7 @@ export function VideoEditorWorkspace() {
 
             {/* Completed Result Card */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-5 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
                 <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Your edited video is ready!</p>
@@ -604,18 +608,18 @@ export function VideoEditorWorkspace() {
                     {result.name} · {formatSize(result.size)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
                   >
                     <Download className="h-4 w-4" /> Download
                   </a>
                   <button
                     type="button"
                     onClick={() => setResult(null)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     Edit again
                   </button>

@@ -19,7 +19,7 @@ export function BackendStatus() {
       role="status"
       aria-live="polite"
       title={tooltipText}
-      className="inline-flex h-9 min-w-[136px] sm:min-w-[184px] items-center justify-between gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 sm:px-3 text-xs font-medium text-slate-200 backdrop-blur-xl transition-colors shrink-0"
+      className="inline-flex h-9 min-w-0 sm:min-w-[184px] items-center justify-between gap-1.5 sm:gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 sm:px-3 text-xs font-medium text-slate-200 backdrop-blur-xl transition-colors shrink-0"
     >
       <div className="flex items-center gap-2 min-w-0">
         {status === "checking" ? (

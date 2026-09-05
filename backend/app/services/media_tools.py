@@ -104,10 +104,17 @@ def validate_media_file(
     if expect_audio and not has_audio:
         raise DownloadFailedError("The downloaded video is missing an audio track.")
 
+    format_data = data.get("format", {})
+    try:
+        duration = float(format_data.get("duration", 0.0))
+    except (ValueError, TypeError):
+        duration = 0.0
+
     return {
         "has_video": has_video,
         "has_audio": has_audio,
         "size": file_path.stat().st_size,
+        "duration": duration,
         "streams": streams,
     }
 
@@ -149,7 +156,11 @@ def clip_media(
         str(output),
     ]
 
-    res = subprocess.run(copy_cmd, capture_output=True, text=True, timeout=300, check=False)
+    try:
+        res = subprocess.run(copy_cmd, capture_output=True, text=True, timeout=300, check=False)
+    except subprocess.TimeoutExpired as exc:
+        raise ClipFetchError("Media clipping timed out", status_code=504) from exc
+
     stream_copy_ok = False
     if res.returncode == 0 and output.exists() and output.stat().st_size > 0:
         try:
@@ -175,7 +186,11 @@ def clip_media(
             "-b:a", "192k",
             str(output),
         ]
-        res2 = subprocess.run(reencode_cmd, capture_output=True, text=True, timeout=300, check=False)
+        try:
+            res2 = subprocess.run(reencode_cmd, capture_output=True, text=True, timeout=300, check=False)
+        except subprocess.TimeoutExpired as exc:
+            raise ClipFetchError("Media clipping timed out", status_code=504) from exc
+
         if res2.returncode != 0 or not output.exists() or output.stat().st_size == 0:
             raise ClipFetchError("Failed to clip media file.", status_code=500)
 
@@ -207,7 +222,9 @@ def video_to_gif(
     if not ffmpeg_cmd:
         raise ClipFetchError("FFmpeg is not installed on the backend server.", status_code=503)
 
-    validate_media_file(source, expect_video=True, expect_audio=False)
+    probe = validate_media_file(source, expect_video=True, expect_audio=False)
+    if not start_time and not end_time and probe.get("duration", 0.0) > 120.0:
+        raise ClipFetchError("Video is too long to convert to GIF without trimming (limit: 120 seconds). Please specify start/end times.", status_code=400)
 
     fps_val = max(1, min(30, int(fps)))
     width_val = max(120, min(1080, int(width)))
@@ -297,7 +314,9 @@ def edit_video(
         raise ClipFetchError("Unsupported output format for video editing", status_code=400)
 
     # Validate that the source file is readable
-    validate_media_file(source, expect_video=True, expect_audio=False)
+    source_probe = validate_media_file(source, expect_video=True, expect_audio=False)
+    has_audio = bool(source_probe.get("has_audio", False))
+    should_include_audio = include_audio and has_audio
 
     speed_val = float(speed)
     if speed_val <= 0 or speed_val > 16.0:
@@ -378,7 +397,7 @@ def edit_video(
     if vf_filters:
         cmd.extend(["-vf", ",".join(vf_filters)])
 
-    if not include_audio:
+    if not should_include_audio:
         cmd.append("-an")
     else:
         if is_speed_changed:
@@ -401,4 +420,4 @@ def edit_video(
         logger.error("FFmpeg edit failed: %s", result.stderr)
         raise ClipFetchError(_conversion_error(result.stderr), status_code=400)
 
-    validate_media_file(output, expect_video=True, expect_audio=include_audio)
+    validate_media_file(output, expect_video=True, expect_audio=should_include_audio)

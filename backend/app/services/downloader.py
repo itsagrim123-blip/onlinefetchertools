@@ -36,12 +36,26 @@ class JobStore:
         self._jobs[job.id] = job
         return job
 
+    def evict_expired(self, max_age_seconds: int = 3600) -> int:
+        now = datetime.now(timezone.utc)
+        evicted = 0
+        for job_id, job in list(self._jobs.items()):
+            ref_time = job.completed_at or job.created_at
+            if ref_time and (now - ref_time).total_seconds() > max_age_seconds:
+                del self._jobs[job_id]
+                evicted += 1
+        return evicted
+
 
 class DownloadService:
     def __init__(self) -> None:
         self.store = JobStore()
         self._lock = threading.Lock()
         self._active_jobs = 0
+
+    def evict_expired_jobs(self, max_age_seconds: int = 3600) -> int:
+        with self._lock:
+            return self.store.evict_expired(max_age_seconds)
 
     def create_job(
         self,
@@ -334,3 +348,14 @@ class DownloadService:
 
         logger.error("No downloadable media found in %s: %s", temp_dir, [str(path.relative_to(temp_dir)) for path in temp_dir.rglob("*")])
         raise DownloadFailedError("Download failed")
+
+
+_default_service: DownloadService | None = None
+
+
+def get_download_service() -> DownloadService:
+    global _default_service
+    if _default_service is None:
+        _default_service = DownloadService()
+    return _default_service
+

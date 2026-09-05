@@ -77,7 +77,9 @@ def _validate_zip_entry(info: zipfile.ZipInfo, dest_dir: Path) -> Path:
         raise ClipFetchError(f"Archive file '{name}' exceeds size limit ({info.file_size // (1024*1024)} MB).", status_code=400)
 
     # Compression bomb check (ratio > 100:1 for entries over 10MB)
-    if info.compress_size > 0 and info.file_size > 10 * 1024 * 1024:
+    if info.file_size > 10 * 1024 * 1024:
+        if info.compress_size == 0:
+            raise ClipFetchError(f"Suspicious zero compressed size detected for non-empty file '{name}'. Potential decompression bomb.", status_code=400)
         ratio = info.file_size / info.compress_size
         if ratio > 100.0:
             raise ClipFetchError(f"Suspicious compression ratio ({ratio:.1f}:1) detected for '{name}'. Potential decompression bomb.", status_code=400)

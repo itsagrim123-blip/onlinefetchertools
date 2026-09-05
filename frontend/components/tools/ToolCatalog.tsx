@@ -45,8 +45,8 @@ const categories = [
 export function ToolCatalog() {
   const [query, setQuery] = useState("");
   return (
-    <div className="space-y-16">
-      <label className="mx-auto flex h-14 max-w-xl items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 text-left shadow-2xl shadow-cyan-950/20">
+    <div className="space-y-10 sm:space-y-16">
+      <label className="mx-auto flex h-12 sm:h-14 max-w-xl items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 text-left shadow-2xl shadow-cyan-950/20">
         <Search className="h-5 w-5 text-slate-500" />
         <input
           value={query}
