@@ -236,11 +236,24 @@ class DownloadService:
         if not temp_dir.exists():
             raise DownloadFailedError("Download failed")
 
-        candidates = sorted(temp_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        candidates = sorted((path for path in temp_dir.rglob("*") if path.is_file()), key=lambda p: p.stat().st_mtime, reverse=True)
+        ignored_suffixes = {
+            ".part",
+            ".ytdl",
+            ".json",
+            ".description",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".vtt",
+            ".srt",
+            ".ass",
+            ".lrc",
+            ".txt",
+        }
         for candidate in candidates:
-            if not candidate.is_file():
-                continue
-            if candidate.suffix.lower() not in {".mp4", ".m4a", ".webm", ".mp3", ".wav", ".mkv", ".m4v"}:
+            if candidate.suffix.lower() in ignored_suffixes:
                 continue
             base_name = sanitize_filename(job.filename or candidate.stem, fallback="clipfetch-download")
             final_name = base_name + candidate.suffix.lower()
@@ -252,4 +265,5 @@ class DownloadService:
             shutil.move(str(candidate), final_path)
             return final_name
 
+        logger.error("No downloadable media found in %s: %s", temp_dir, [str(path.relative_to(temp_dir)) for path in temp_dir.rglob("*")])
         raise DownloadFailedError("Download failed")
