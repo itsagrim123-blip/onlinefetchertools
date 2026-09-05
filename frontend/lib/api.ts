@@ -59,7 +59,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
 
 function getApiUrl(path: string): string {
   if (!API_BASE_URL) {
-    throw new Error("ClipFetch API URL is not configured. Set NEXT_PUBLIC_API_URL.");
+    throw new Error("Online Fetcher Tools API URL is not configured. Set NEXT_PUBLIC_API_URL.");
   }
   return `${API_BASE_URL}${path}`;
 }
@@ -84,7 +84,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
   } catch {
-    throw new Error("Unable to reach the ClipFetch backend. Check the API URL and backend status.");
+    throw new Error("Unable to reach the Online Fetcher Tools backend. Check the API URL and backend status.");
   }
 
   if (!response.ok) {
@@ -142,7 +142,7 @@ export async function runFileTool(slug: string, body: FormData): Promise<{ blob:
   try {
     response = await fetch(getApiUrl(endpoint), { method: "POST", body });
   } catch {
-    throw new Error("Unable to reach the ClipFetch backend.");
+    throw new Error("Unable to reach the Online Fetcher Tools backend.");
   }
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({ detail: "Processing failed" }))) as ApiError;

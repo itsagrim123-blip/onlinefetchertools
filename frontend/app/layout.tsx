@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ClipFetch — All your media & file tools",
+  title: "Online Fetcher Tools — All your media & file tools",
   description: "Download, convert, compress and manage files and media in one place.",
 };
 

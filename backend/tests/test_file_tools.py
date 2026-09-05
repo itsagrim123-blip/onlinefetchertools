@@ -7,6 +7,7 @@ from pypdf import PdfReader, PdfWriter
 
 from app.main import app
 from app.services.image_tools import compress_image, convert_image, resize_image
+from app.services.media_tools import _conversion_error
 from app.services.pdf_tools import merge_pdfs, split_pdf
 
 client = TestClient(app)
@@ -69,3 +70,8 @@ def test_pdf_merge_split_and_from_images(tmp_path):
     response = client.post("/api/pdf/from-images", files={"files": ("page.png", image, "image/png")})
     assert response.status_code == 200
     assert response.content[:4] == b"%PDF"
+
+
+def test_media_errors_are_actionable():
+    assert "audio track" in _conversion_error("Output file #0 does not contain any stream")
+    assert "readable media" in _conversion_error("moov atom not found")

@@ -9,6 +9,18 @@ VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".mkv", ".avi"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".aac", ".m4a", ".ogg", ".flac"}
 
 
+def _conversion_error(stderr: str) -> str:
+    """Turn common FFmpeg failures into safe, actionable messages."""
+    detail = stderr.lower()
+    if "does not contain any stream" in detail or "output file #0 does not contain any stream" in detail:
+        return "This video does not contain an audio track to extract."
+    if "moov atom not found" in detail or "invalid data found when processing input" in detail:
+        return "This file is not a readable media file. Try downloading or exporting it again."
+    if "could not find codec parameters" in detail or "unknown decoder" in detail:
+        return "This file uses a video or audio codec that cannot be read on this server."
+    return "Media conversion failed. Make sure the uploaded file is complete and playable."
+
+
 def convert_media(source: Path, output: Path, output_format: str) -> None:
     allowed = {"mp4", "webm", "mov", "mkv", "mp3", "wav", "aac", "m4a", "ogg"}
     target = output_format.lower().lstrip(".")
@@ -25,4 +37,4 @@ def convert_media(source: Path, output: Path, output_format: str) -> None:
     except subprocess.TimeoutExpired as exc:
         raise ClipFetchError("Media processing timed out", status_code=504) from exc
     if result.returncode != 0 or not output.exists():
-        raise ClipFetchError("Media conversion failed", status_code=400)
+        raise ClipFetchError(_conversion_error(result.stderr), status_code=400)
