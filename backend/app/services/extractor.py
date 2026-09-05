@@ -47,7 +47,11 @@ class ExtractorService:
         formats: list[VideoFormat] = []
         seen: set[str] = set()
 
-        for entry in info.get("formats", []) or []:
+        raw_formats = info.get("formats", []) or []
+        has_any_video = False
+        has_any_audio = False
+
+        for entry in raw_formats:
             format_id = entry.get("format_id")
             if not format_id:
                 continue
@@ -57,10 +61,17 @@ class ExtractorService:
                 continue
             seen.add(format_key)
 
-            if entry.get("vcodec") == "none" and entry.get("acodec") != "none":
+            has_v = entry.get("vcodec") not in (None, "none")
+            has_a = entry.get("acodec") not in (None, "none")
+
+            if not has_v and has_a:
                 ftype = "audio"
-            elif entry.get("vcodec") not in (None, "none"):
+                has_any_audio = True
+            elif has_v:
                 ftype = "video"
+                has_any_video = True
+                if has_a:
+                    has_any_audio = True
             else:
                 continue
 
@@ -75,7 +86,25 @@ class ExtractorService:
                     filesize=int(filesize) if filesize is not None else None,
                     type=ftype,
                     quality_label=str(entry.get("format_note") or entry.get("quality") or "unknown"),
+                    has_video=has_v,
+                    has_audio=has_a,
                 )
+            )
+
+        # Prepend "best" option for optimal video+audio merged quality
+        if has_any_video:
+            formats.insert(
+                0,
+                VideoFormat(
+                    format_id="best",
+                    resolution="Best Quality",
+                    ext="mp4",
+                    filesize=None,
+                    type="video",
+                    quality_label="Best Available (Video + Audio)",
+                    has_video=True,
+                    has_audio=True,
+                ),
             )
 
         if not formats:
@@ -87,6 +116,8 @@ class ExtractorService:
                     filesize=None,
                     type="audio",
                     quality_label="audio",
+                    has_video=False,
+                    has_audio=True,
                 )
             ]
 

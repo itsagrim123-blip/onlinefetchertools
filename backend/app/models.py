@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
@@ -19,6 +19,8 @@ class VideoFormat(BaseModel):
     filesize: int | None = None
     type: Literal["video", "audio"] = "video"
     quality_label: str | None = None
+    has_video: bool = True
+    has_audio: bool = True
 
 
 class VideoMetadata(BaseModel):
@@ -35,6 +37,8 @@ class DownloadRequest(BaseModel):
     url: str = Field(..., min_length=8, max_length=2000)
     format_id: str = Field(..., min_length=1, max_length=200)
     filename_preference: str | None = Field(default=None, max_length=255)
+    start_time: str | None = Field(default=None, max_length=30)
+    end_time: str | None = Field(default=None, max_length=30)
 
 
 class DownloadStatus(BaseModel):
@@ -55,10 +59,12 @@ class DownloadJob(BaseModel):
     status: Literal["queued", "downloading", "processing", "complete", "failed"] = "queued"
     progress: int = 0
     filename: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None
     error: str | None = None
     temp_dir: str | None = None
     downloaded_size: str | None = None
     speed: str | None = None
     eta: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None

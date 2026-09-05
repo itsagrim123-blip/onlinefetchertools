@@ -14,6 +14,7 @@ def test_finalize_download_accepts_media_containers(tmp_path, monkeypatch):
     media_file.write_bytes(b"media")
 
     monkeypatch.setattr("app.services.downloader.get_settings", lambda: type("Settings", (), {"download_path": tmp_path / "downloads"})())
+    monkeypatch.setattr("app.services.downloader.validate_media_file", lambda *a, **kw: {"has_video": True, "has_audio": True})
 
     filename = service._finalize_download(job)
 
@@ -30,6 +31,7 @@ def test_finalize_download_finds_nested_yt_dlp_output(tmp_path, monkeypatch):
     media_file.write_bytes(b"media")
 
     monkeypatch.setattr("app.services.downloader.get_settings", lambda: type("Settings", (), {"download_path": tmp_path / "downloads"})())
+    monkeypatch.setattr("app.services.downloader.validate_media_file", lambda *a, **kw: {"has_video": True, "has_audio": True})
 
     filename = service._finalize_download(job)
 
@@ -45,6 +47,7 @@ def test_finalize_download_uses_video_title_by_default(tmp_path, monkeypatch):
     (temp_dir / "My Video Title.mp4").write_bytes(b"media")
 
     monkeypatch.setattr("app.services.downloader.get_settings", lambda: type("Settings", (), {"download_path": tmp_path / "downloads"})())
+    monkeypatch.setattr("app.services.downloader.validate_media_file", lambda *a, **kw: {"has_video": True, "has_audio": True})
 
     filename = service._finalize_download(job)
 

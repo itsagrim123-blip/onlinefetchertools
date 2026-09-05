@@ -34,7 +34,13 @@ async def analyze(payload: AnalyzeRequest) -> VideoMetadata:
 @router.post("/api/download")
 async def create_download(payload: DownloadRequest) -> dict[str, str]:
     try:
-        job = downloader.create_job(payload.url, payload.format_id, payload.filename_preference)
+        job = downloader.create_job(
+            payload.url,
+            payload.format_id,
+            payload.filename_preference,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+        )
         downloader.start(job)
         return {"job_id": job.id, "status": job.status}
     except ClipFetchError as exc:

@@ -6,6 +6,8 @@ export type VideoFormat = {
   filesize?: number | null;
   type: "video" | "audio";
   quality_label?: string | null;
+  has_video?: boolean;
+  has_audio?: boolean;
 };
 
 export type VideoMetadata = {
@@ -22,6 +24,8 @@ export type DownloadRequest = {
   url: string;
   format_id: string;
   filename_preference?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
 };
 
 export type DownloadJob = {
@@ -38,6 +42,8 @@ export type DownloadJob = {
   downloaded_size?: string | null;
   speed?: string | null;
   eta?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
 };
 
 export type DownloadStatus = {
@@ -109,9 +115,6 @@ export async function checkBackendHealth(timeoutMs: number = 8000): Promise<Heal
 
     clearTimeout(timeoutId);
 
-    // Requirement: consider HTTP response successful only when endpoint returns a 2xx status
-    // and response can be parsed as JSON. Dependency fields (including FFmpeg) should NOT make
-    // server appear Offline.
     if (!response.ok) {
       return {
         isOnline: false,
@@ -185,10 +188,22 @@ export async function analyzeUrl(url: string): Promise<VideoMetadata> {
   });
 }
 
-export async function createDownload(url: string, formatId: string, filenamePreference?: string): Promise<{ job_id: string; status: string }> {
+export async function createDownload(
+  url: string,
+  formatId: string,
+  filenamePreference?: string,
+  startTime?: string,
+  endTime?: string
+): Promise<{ job_id: string; status: string }> {
   return api<{ job_id: string; status: string }>("/api/download", {
     method: "POST",
-    body: JSON.stringify({ url, format_id: formatId, filename_preference: filenamePreference ?? null }),
+    body: JSON.stringify({
+      url,
+      format_id: formatId,
+      filename_preference: filenamePreference ?? null,
+      start_time: startTime ?? null,
+      end_time: endTime ?? null,
+    }),
   });
 }
 
