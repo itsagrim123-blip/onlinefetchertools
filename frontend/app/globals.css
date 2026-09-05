@@ -45,3 +45,208 @@ img {
     scroll-behavior: auto !important;
   }
 }
+
+/* Light theme styling */
+html.light,
+html[data-theme="light"] {
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --color-slate-950: #ffffff;
+  --color-slate-900: #f8fafc;
+  --color-slate-800: #f1f5f9;
+  --color-slate-700: #e2e8f0;
+  --color-slate-600: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-400: #475569;
+  --color-slate-300: #334155;
+  --color-slate-200: #1e293b;
+  --color-slate-100: #0f172a;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.light main {
+  background: radial-gradient(circle at top, rgba(6, 182, 212, 0.1), transparent 40%), linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%) !important;
+  color: #0f172a !important;
+}
+
+/* Light mode header */
+html.light header {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+html.light header .text-white {
+  color: #0f172a !important;
+}
+
+html.light header .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light header .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light header .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light header .border-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light header .bg-white\/5 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light header a[href*="github"] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+html.light header a[href*="github"]:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.light header details div {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light header details div a {
+  color: #334155 !important;
+}
+
+html.light header details div a:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Light mode hero & headings */
+html.light h1.text-white,
+html.light h2.text-white,
+html.light h3.text-white {
+  color: #0f172a !important;
+}
+
+html.light p.text-slate-300,
+html.light p.text-slate-400 {
+  color: #475569 !important;
+}
+
+html.light .text-cyan-200 {
+  color: #0891b2 !important;
+}
+
+html.light .border-cyan-500\/30 {
+  border-color: rgba(6, 182, 212, 0.35) !important;
+}
+
+html.light .bg-cyan-500\/10 {
+  background-color: rgba(6, 182, 212, 0.1) !important;
+}
+
+/* Light mode search bar */
+html.light label.max-w-xl {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06) !important;
+}
+
+html.light label.max-w-xl input {
+  color: #0f172a !important;
+}
+
+html.light label.max-w-xl input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Light mode tool cards */
+html.light a[href^="/tools/"] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light a[href^="/tools/"]:hover {
+  background-color: rgba(6, 182, 212, 0.04) !important;
+  border-color: rgba(6, 182, 212, 0.5) !important;
+  box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.1) !important;
+}
+
+html.light a[href^="/tools/"] .bg-slate-950\/70 {
+  background-color: #f0fdfa !important;
+  border-color: #ccfbf1 !important;
+  color: #0891b2 !important;
+}
+
+html.light a[href^="/tools/"] .text-cyan-300\/75 {
+  color: #0891b2 !important;
+}
+
+html.light a[href^="/tools/"] .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Light mode tool pages & containers */
+html.light .bg-slate-900\/70,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/50,
+html.light .bg-slate-900 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/50,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .border-white\/10,
+html.light .border-white\/5,
+html.light .border-white\/20 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .bg-white\/5,
+html.light .bg-white\/\[0\.035\] {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-white\/10 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light input,
+html.light select,
+html.light textarea {
+  color: #0f172a !important;
+}
+
+html.light input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Light mode footer */
+html.light footer {
+  background-color: #ffffff !important;
+  border-top-color: #e2e8f0 !important;
+}
+
+html.light footer p {
+  color: #64748b !important;
+}
