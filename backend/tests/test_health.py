@@ -19,3 +19,16 @@ def test_health_endpoint():
     data = response.json()
     assert data["status"] == "ok"
     assert data["service"] == "ClipFetch"
+
+
+def test_vercel_origin_is_allowed():
+    response = client.options(
+        "/api/analyze",
+        headers={
+            "Origin": "https://clipfetch-preview.vercel.app",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "https://clipfetch-preview.vercel.app"
