@@ -253,7 +253,7 @@ From the repository root, use separate VS Code terminals. PowerShell execution p
 
 ```powershell
 # Terminal 1: start FastAPI
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1 -FrontendOrigin https://your-project.vercel.app
 
 # Terminal 2: verify local FastAPI before exposing it
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-backend.ps1

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [int]$Port = 8000
+    [int]$Port = 8000,
+    [string]$FrontendOrigin = "http://localhost:3000"
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +15,8 @@ if (-not (Test-Path $python)) {
 
 Push-Location $backend
 try {
+    $env:FRONTEND_ORIGIN = $FrontendOrigin
+    Write-Host "Allowing CORS origin: $FrontendOrigin" -ForegroundColor Cyan
     & $python -m uvicorn app.main:app --host 0.0.0.0 --port $Port --log-level info
 } finally {
     Pop-Location
