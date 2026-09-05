@@ -126,12 +126,14 @@ export function PdfPageManagerWorkspace() {
       form.append("file", file);
       form.append("order", order);
 
-      const response = await runFileTool("pdf-page-manager", form);
-      const url = URL.createObjectURL(response.blob);
       const cleanStem = file.name.replace(/\.[^/.]+$/, "");
+      const fallbackName = `${cleanStem}_managed.pdf`;
+      const response = await runFileTool("pdf-page-manager", form, fallbackName);
+      if (result?.url) URL.revokeObjectURL(result.url);
+      const url = URL.createObjectURL(response.blob);
       setResult({
         url,
-        name: response.filename || `${cleanStem}_managed.pdf`,
+        name: response.filename,
         size: response.blob.size,
       });
     } catch (cause) {
@@ -184,6 +186,7 @@ export function PdfPageManagerWorkspace() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (result?.url) URL.revokeObjectURL(result.url);
                     setFile(null);
                     setPages([]);
                     setOriginalPages([]);
@@ -323,7 +326,10 @@ export function PdfPageManagerWorkspace() {
                   </a>
                   <button
                     type="button"
-                    onClick={() => setResult(null)}
+                    onClick={() => {
+                      if (result?.url) URL.revokeObjectURL(result.url);
+                      setResult(null);
+                    }}
                     className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     Manage more

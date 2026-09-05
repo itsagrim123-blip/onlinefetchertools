@@ -171,11 +171,14 @@ export function VideoEditorWorkspace() {
       form.append("include_audio", includeAudio ? "true" : "false");
       if (speed !== 1.0) form.append("speed", String(speed));
 
-      const response = await runFileTool("video-editor", form);
+      const stem = file.name.replace(/\.[^/.]+$/, "");
+      const fallbackName = `${stem}_edited.${outputFormat}`;
+      const response = await runFileTool("video-editor", form, fallbackName);
+      if (result?.url) URL.revokeObjectURL(result.url);
       const url = URL.createObjectURL(response.blob);
       setResult({
         url,
-        name: response.filename || `${file.name.replace(/\.[^/.]+$/, "")}_edited.${outputFormat}`,
+        name: response.filename,
         size: response.blob.size,
       });
     } catch (cause) {
@@ -197,10 +200,21 @@ export function VideoEditorWorkspace() {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const mime = frameFormat === "png" ? "image/png" : "image/jpeg";
       const ext = frameFormat;
-      const dataUrl = canvas.toDataURL(mime, 0.95);
-      const cleanStem = file ? file.name.replace(/\.[^/.]+$/, "") : "video";
-      const filename = `${cleanStem}_frame_${currentTime.toFixed(1)}s.${ext}`;
-      setCapturedFrame({ url: dataUrl, name: filename });
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            setError("Unable to capture frame directly from preview.");
+            return;
+          }
+          if (capturedFrame?.url) URL.revokeObjectURL(capturedFrame.url);
+          const url = URL.createObjectURL(blob);
+          const cleanStem = file ? file.name.replace(/\.[^/.]+$/, "") : "video";
+          const filename = `${cleanStem}_frame_${currentTime.toFixed(1)}s.${ext}`;
+          setCapturedFrame({ url, name: filename });
+        },
+        mime,
+        0.95
+      );
     } catch {
       setError("Unable to capture frame directly from preview.");
     }
@@ -214,6 +228,8 @@ export function VideoEditorWorkspace() {
   };
 
   const resetAll = () => {
+    if (result?.url) URL.revokeObjectURL(result.url);
+    if (capturedFrame?.url) URL.revokeObjectURL(capturedFrame.url);
     setFile(null);
     setResult(null);
     setError(null);
@@ -618,7 +634,10 @@ export function VideoEditorWorkspace() {
                   </a>
                   <button
                     type="button"
-                    onClick={() => setResult(null)}
+                    onClick={() => {
+                      if (result?.url) URL.revokeObjectURL(result.url);
+                      setResult(null);
+                    }}
                     className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     Edit again

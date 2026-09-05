@@ -21,14 +21,15 @@ from app.services.pdf_tools import (
 )
 from app.utils.concurrency import PDF_SEMAPHORE
 from app.utils.files import cleanup_work_dir, create_work_dir, safe_upload_name, save_upload
+from app.utils.responses import download_response
 
 router = APIRouter(prefix="/api/pdf", tags=["PDF tools"])
 PDF_EXTENSIONS = {".pdf"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
-def result_file(work_dir: Path, output: Path, media_type: str = "application/octet-stream") -> FileResponse:
-    return FileResponse(output, filename=output.name, media_type=media_type, background=BackgroundTask(cleanup_work_dir, work_dir))
+def result_file(work_dir: Path, output: Path, media_type: str | None = None) -> FileResponse:
+    return download_response(output, filename=output.name, media_type=media_type, work_dir=work_dir)
 
 
 @router.post("/merge")

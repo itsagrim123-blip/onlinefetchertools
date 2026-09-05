@@ -12,17 +12,18 @@ from app.errors import ClipFetchError
 from app.services.archive_tools import create_zip_archive, extract_zip_archive, inspect_zip_archive
 from app.utils.concurrency import ARCHIVE_SEMAPHORE
 from app.utils.files import cleanup_work_dir, create_work_dir, safe_upload_name, save_upload
+from app.utils.responses import download_response
 
 router = APIRouter(prefix="/api/file", tags=["File and Archive tools"])
 ZIP_EXTENSIONS = {".zip"}
 
 
 def result_file(work_dir: Path, output: Path, media_type: str = "application/zip") -> FileResponse:
-    return FileResponse(
+    return download_response(
         output,
         filename=output.name,
         media_type=media_type,
-        background=BackgroundTask(cleanup_work_dir, work_dir),
+        work_dir=work_dir,
     )
 
 

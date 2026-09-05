@@ -68,12 +68,14 @@ export function ZipExtractorWorkspace() {
       const form = new FormData();
       form.append("file", file);
 
-      const response = await runFileTool("zip-extractor", form);
-      const url = URL.createObjectURL(response.blob);
       const stem = file.name.replace(/\.[^/.]+$/, "");
+      const fallbackName = `${stem}_extracted.zip`;
+      const response = await runFileTool("zip-extractor", form, fallbackName);
+      if (result?.url) URL.revokeObjectURL(result.url);
+      const url = URL.createObjectURL(response.blob);
       setResult({
         url,
-        name: response.filename || `${stem}_extracted.zip`,
+        name: response.filename,
         size: response.blob.size,
       });
     } catch (cause) {
@@ -120,6 +122,7 @@ export function ZipExtractorWorkspace() {
               <button
                 type="button"
                 onClick={() => {
+                  if (result?.url) URL.revokeObjectURL(result.url);
                   setFile(null);
                   setEntries([]);
                   setResult(null);
@@ -208,7 +211,10 @@ export function ZipExtractorWorkspace() {
                   </a>
                   <button
                     type="button"
-                    onClick={() => setResult(null)}
+                    onClick={() => {
+                      if (result?.url) URL.revokeObjectURL(result.url);
+                      setResult(null);
+                    }}
                     className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     <RotateCcw className="h-4 w-4" /> Reset

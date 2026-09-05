@@ -152,13 +152,16 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
         form.append("flip_vertical", flipV ? "true" : "false");
       }
 
-      const response = await runFileTool(endpointSlug, form);
-      const url = URL.createObjectURL(response.blob);
       const stem = file.name.replace(/\.[^/.]+$/, "");
       const actionName = isCropper ? "cropped" : "rotated";
+      const fallbackName = `${stem}_${actionName}.${outputFormat}`;
+
+      const response = await runFileTool(endpointSlug, form, fallbackName);
+      if (result?.url) URL.revokeObjectURL(result.url);
+      const url = URL.createObjectURL(response.blob);
       setResult({
         url,
-        name: response.filename || `${stem}_${actionName}.${outputFormat}`,
+        name: response.filename,
         size: response.blob.size,
       });
     } catch (cause) {
@@ -169,6 +172,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
   };
 
   const resetAll = () => {
+    if (result?.url) URL.revokeObjectURL(result.url);
     setFile(null);
     setResult(null);
     setError(null);
@@ -451,7 +455,10 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                   </a>
                   <button
                     type="button"
-                    onClick={() => setResult(null)}
+                    onClick={() => {
+                      if (result?.url) URL.revokeObjectURL(result.url);
+                      setResult(null);
+                    }}
                     className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     Edit again

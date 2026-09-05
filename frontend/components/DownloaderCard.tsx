@@ -267,8 +267,7 @@ export function DownloaderCard() {
           {jobId && status === "complete" && finalDownloadUrl ? (
             <a
               href={finalDownloadUrl}
-              target="_blank"
-              rel="noreferrer"
+              download={downloadInfo?.filename || (activeTab === "audio" ? "audio.mp3" : "video.mp4")}
               className="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110"
             >
               <Download className="mr-2 h-4 w-4" />

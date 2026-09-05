@@ -16,23 +16,23 @@ type ToolConfig = {
 };
 
 const configs: Record<string, ToolConfig> = {
-  "image-compressor": { slug: "image-compressor", title: "Image Compressor", description: "Shrink JPG, PNG and WebP files while keeping them crisp.", accept: ".jpg,.jpeg,.png,.webp", action: "Compress image", output: "Compressed image", options: "image" },
-  "image-resizer": { slug: "image-resizer", title: "Image Resizer", description: "Resize an image to exact dimensions or a responsive width.", accept: ".jpg,.jpeg,.png,.webp", action: "Resize image", output: "Resized image", options: "resize" },
-  "jpg-to-png": { slug: "jpg-to-png", title: "JPG to PNG", description: "Convert JPG images to transparent-friendly PNG files.", accept: ".jpg,.jpeg", action: "Convert to PNG", output: "PNG image" },
-  "png-to-jpg": { slug: "png-to-jpg", title: "PNG to JPG", description: "Create compact JPG images from PNG files.", accept: ".png", action: "Convert to JPG", output: "JPG image" },
-  "webp-to-jpg": { slug: "webp-to-jpg", title: "WebP to JPG", description: "Turn WebP images into widely compatible JPG files.", accept: ".webp", action: "Convert to JPG", output: "JPG image" },
-  "webp-to-png": { slug: "webp-to-png", title: "WebP to PNG", description: "Convert WebP files to lossless PNG images.", accept: ".webp", action: "Convert to PNG", output: "PNG image" },
-  "jpg-to-webp": { slug: "jpg-to-webp", title: "JPG to WebP", description: "Convert JPG photos to modern, lightweight WebP format.", accept: ".jpg,.jpeg", action: "Convert to WebP", output: "WebP image", options: "image" },
-  "png-to-webp": { slug: "png-to-webp", title: "PNG to WebP", description: "Convert PNG images to WebP while preserving transparency.", accept: ".png", action: "Convert to WebP", output: "WebP image", options: "image" },
-  "heic-to-jpg": { slug: "heic-to-jpg", title: "HEIC to JPG", description: "Convert Apple HEIC photos into standard JPG images.", accept: ".heic,.heif", action: "Convert to JPG", output: "JPG image", options: "image" },
-  "image-to-pdf": { slug: "image-to-pdf", title: "Images to PDF", description: "Combine JPG, PNG or WebP images into one PDF.", accept: ".jpg,.jpeg,.png,.webp", multiple: true, action: "Create PDF", output: "PDF document" },
-  "pdf-merge": { slug: "pdf-merge", title: "Merge PDF", description: "Combine multiple PDF files in the order you choose.", accept: ".pdf", multiple: true, action: "Merge PDFs", output: "Merged PDF" },
-  "pdf-split": { slug: "pdf-split", title: "Split PDF", description: "Split every page or export custom page ranges as a ZIP.", accept: ".pdf", action: "Split PDF", output: "ZIP archive", options: "pdf-split" },
-  "pdf-compressor": { slug: "pdf-compressor", title: "Compress PDF", description: "Rewrite a PDF with compressed content streams and report the result.", accept: ".pdf", action: "Compress PDF", output: "Compressed PDF" },
-  "pdf-to-images": { slug: "pdf-to-images", title: "PDF to Images", description: "Render PDF pages to a downloadable PNG ZIP.", accept: ".pdf", action: "Render pages", output: "Images ZIP" },
+  "image-compressor": { slug: "image-compressor", title: "Image Compressor", description: "Shrink JPG, PNG and WebP files while keeping them crisp.", accept: ".jpg,.jpeg,.png,.webp", action: "Compress image", output: "compressed.jpg", options: "image" },
+  "image-resizer": { slug: "image-resizer", title: "Image Resizer", description: "Resize an image to exact dimensions or a responsive width.", accept: ".jpg,.jpeg,.png,.webp", action: "Resize image", output: "resized.jpg", options: "resize" },
+  "jpg-to-png": { slug: "jpg-to-png", title: "JPG to PNG", description: "Convert JPG images to transparent-friendly PNG files.", accept: ".jpg,.jpeg", action: "Convert to PNG", output: "converted.png" },
+  "png-to-jpg": { slug: "png-to-jpg", title: "PNG to JPG", description: "Create compact JPG images from PNG files.", accept: ".png", action: "Convert to JPG", output: "converted.jpg" },
+  "webp-to-jpg": { slug: "webp-to-jpg", title: "WebP to JPG", description: "Turn WebP images into widely compatible JPG files.", accept: ".webp", action: "Convert to JPG", output: "converted.jpg" },
+  "webp-to-png": { slug: "webp-to-png", title: "WebP to PNG", description: "Convert WebP files to lossless PNG images.", accept: ".webp", action: "Convert to PNG", output: "converted.png" },
+  "jpg-to-webp": { slug: "jpg-to-webp", title: "JPG to WebP", description: "Convert JPG photos to modern, lightweight WebP format.", accept: ".jpg,.jpeg", action: "Convert to WebP", output: "converted.webp", options: "image" },
+  "png-to-webp": { slug: "png-to-webp", title: "PNG to WebP", description: "Convert PNG images to WebP while preserving transparency.", accept: ".png", action: "Convert to WebP", output: "converted.webp", options: "image" },
+  "heic-to-jpg": { slug: "heic-to-jpg", title: "HEIC to JPG", description: "Convert Apple HEIC photos into standard JPG images.", accept: ".heic,.heif", action: "Convert to JPG", output: "converted.jpg", options: "image" },
+  "image-to-pdf": { slug: "image-to-pdf", title: "Images to PDF", description: "Combine JPG, PNG or WebP images into one PDF.", accept: ".jpg,.jpeg,.png,.webp", multiple: true, action: "Create PDF", output: "images.pdf" },
+  "pdf-merge": { slug: "pdf-merge", title: "Merge PDF", description: "Combine multiple PDF files in the order you choose.", accept: ".pdf", multiple: true, action: "Merge PDFs", output: "merged.pdf" },
+  "pdf-split": { slug: "pdf-split", title: "Split PDF", description: "Split every page or export custom page ranges as a ZIP.", accept: ".pdf", action: "Split PDF", output: "split.zip", options: "pdf-split" },
+  "pdf-compressor": { slug: "pdf-compressor", title: "Compress PDF", description: "Rewrite a PDF with compressed content streams and report the result.", accept: ".pdf", action: "Compress PDF", output: "compressed.pdf" },
+  "pdf-to-images": { slug: "pdf-to-images", title: "PDF to Images", description: "Render PDF pages to a downloadable PNG ZIP.", accept: ".pdf", action: "Render pages", output: "images.zip" },
   "pdf-to-text": { slug: "pdf-to-text", title: "PDF to Text", description: "Extract readable text content from PDF pages into a plain text file.", accept: ".pdf", action: "Extract text", output: "extracted-text.txt" },
-  "media-converter": { slug: "media-converter", title: "Media Converter", description: "Convert common video and audio formats with FFmpeg.", accept: "video/*,audio/*", action: "Convert media", output: "Converted media", options: "media" },
-  "audio-extractor": { slug: "audio-extractor", title: "Extract Audio", description: "Pull an MP3 audio track from a video file.", accept: "video/*", action: "Extract audio", output: "MP3 audio", options: "media" },
+  "media-converter": { slug: "media-converter", title: "Media Converter", description: "Convert common video and audio formats with FFmpeg.", accept: "video/*,audio/*", action: "Convert media", output: "converted.mp4", options: "media" },
+  "audio-extractor": { slug: "audio-extractor", title: "Extract Audio", description: "Pull an MP3 audio track from a video file.", accept: "video/*", action: "Extract audio", output: "extracted-audio.mp3", options: "media" },
   "video-to-gif": { slug: "video-to-gif", title: "Video to GIF", description: "Convert video clips into animated, shareable GIFs.", accept: ".mp4,.webm,.mov,.mkv,.avi,video/*", action: "Create GIF", output: "clip.gif", options: "video-gif" },
   "zip-creator": { slug: "zip-creator", title: "ZIP Creator", description: "Package multiple files into a clean, portable ZIP archive.", accept: "*/*", multiple: true, action: "Create ZIP archive", output: "archive.zip" },
 };
@@ -58,6 +58,7 @@ export function FileToolWorkspace({ slug }: { slug: string }) {
 
   const totalSize = useMemo(() => files.reduce((total, file) => total + file.size, 0), [files]);
   const addFiles = (incoming: File[]) => {
+    if (result?.url) URL.revokeObjectURL(result.url);
     setError(null);
     setResult(null);
     setTextPreview(null);
@@ -68,7 +69,7 @@ export function FileToolWorkspace({ slug }: { slug: string }) {
 
   const process = async () => {
     if (!files.length) return setError("Choose at least one file first.");
-    setBusy(true); setError(null); setResult(null); setTextPreview(null);
+    setBusy(true); setError(null); setTextPreview(null);
     try {
       const form = new FormData();
       files.forEach((file) => form.append(config.multiple ? "files" : "file", file));
@@ -90,9 +91,15 @@ export function FileToolWorkspace({ slug }: { slug: string }) {
       if (slug === "jpg-to-webp" || slug === "png-to-webp") form.append("output_format", "webp");
       if (slug === "heic-to-jpg") form.append("output_format", "jpg");
 
-      const response = await runFileTool(slug, form);
+      const firstFile = files[0];
+      const stem = firstFile ? firstFile.name.replace(/\.[^/.]+$/, "") : "file";
+      const ext = config.output ? config.output.match(/\.[^/.]+$/)?.[0] || "" : "";
+      const fallbackName = `${stem}_${slug}${ext}`;
+
+      const response = await runFileTool(slug, form, fallbackName);
+      if (result?.url) URL.revokeObjectURL(result.url);
       const url = URL.createObjectURL(response.blob);
-      setResult({ url, name: response.filename || config.output || "download", size: response.blob.size });
+      setResult({ url, name: response.filename, size: response.blob.size });
 
       if (slug === "pdf-to-text") {
         try {
@@ -217,7 +224,7 @@ export function FileToolWorkspace({ slug }: { slug: string }) {
               <a href={result.url} download={result.name} className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition">
                 <Download className="h-4 w-4" /> Download
               </a>
-              <button type="button" onClick={() => { setFiles([]); setResult(null); setTextPreview(null); }} className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm text-slate-300 hover:bg-white/10">
+              <button type="button" onClick={() => { if (result?.url) URL.revokeObjectURL(result.url); setFiles([]); setResult(null); setTextPreview(null); }} className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm text-slate-300 hover:bg-white/10">
                 <RotateCcw className="h-4 w-4" /> Another
               </button>
             </div>

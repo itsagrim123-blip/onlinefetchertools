@@ -244,7 +244,13 @@ const toolEndpoints: Record<string, string> = {
   "zip-extractor": "/api/file/extract-zip",
 };
 
-export async function runFileTool(slug: string, body: FormData): Promise<{ blob: Blob; filename: string }> {
+import { normalizeBlob, parseFilename, resolveMimeType } from "./download";
+
+export async function runFileTool(
+  slug: string,
+  body: FormData,
+  fallbackFilename?: string
+): Promise<{ blob: Blob; filename: string }> {
   const endpoint = toolEndpoints[slug];
   if (!endpoint) throw new Error("This tool is not available.");
   let response: Response;
@@ -257,9 +263,12 @@ export async function runFileTool(slug: string, body: FormData): Promise<{ blob:
     const errorBody = (await response.json().catch(() => ({ detail: "Processing failed" }))) as ApiError;
     throw new Error(getApiErrorMessage(errorBody));
   }
-  const disposition = response.headers.get("content-disposition") ?? "";
-  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? "download";
-  return { blob: await response.blob(), filename };
+  const contentType = response.headers.get("content-type");
+  const filename = parseFilename(response.headers, fallbackFilename || "download");
+  const rawBlob = await response.blob();
+  const mimeType = resolveMimeType(contentType, filename, rawBlob.type);
+  const blob = normalizeBlob(rawBlob, mimeType);
+  return { blob, filename };
 }
 
 export type PdfThumbnailsResponse = {

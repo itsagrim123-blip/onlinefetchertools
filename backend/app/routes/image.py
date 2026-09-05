@@ -10,12 +10,13 @@ from starlette.background import BackgroundTask
 from app.errors import ClipFetchError
 from app.services.image_tools import IMAGE_EXTENSIONS, compress_image, convert_image, crop_image, resize_image, rotate_image
 from app.utils.files import cleanup_work_dir, create_work_dir, safe_upload_name, save_upload
+from app.utils.responses import download_response
 
 router = APIRouter(prefix="/api/image", tags=["Image tools"])
 
 
-def result_file(work_dir: Path, output: Path) -> FileResponse:
-    return FileResponse(output, filename=output.name, media_type="application/octet-stream", background=BackgroundTask(cleanup_work_dir, work_dir))
+def result_file(work_dir: Path, output: Path, filename: str | None = None) -> FileResponse:
+    return download_response(output, filename=filename or output.name, work_dir=work_dir)
 
 
 async def input_image(upload: UploadFile, work_dir: Path) -> Path:
@@ -30,9 +31,12 @@ async def convert(file: UploadFile = File(...), output_format: str = Form("png")
     work_dir = create_work_dir()
     try:
         source = await input_image(file, work_dir)
-        output = work_dir / f"converted.{output_format.lower().lstrip('.') or 'png'}"
+        stem = Path(safe_upload_name(file.filename, "image")).stem
+        target_ext = output_format.lower().lstrip(".") or "png"
+        out_name = f"{stem}_converted.{target_ext}"
+        output = work_dir / out_name
         await asyncio.to_thread(convert_image, source, output, output_format, quality)
-        return result_file(work_dir, output)
+        return result_file(work_dir, output, out_name)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
@@ -43,9 +47,11 @@ async def compress(file: UploadFile = File(...), quality: int = Form(75)):
     work_dir = create_work_dir()
     try:
         source = await input_image(file, work_dir)
-        output = work_dir / f"compressed{source.suffix.lower()}"
+        stem = Path(safe_upload_name(file.filename, "image")).stem
+        out_name = f"{stem}_compressed{source.suffix.lower()}"
+        output = work_dir / out_name
         await asyncio.to_thread(compress_image, source, output, quality)
-        return result_file(work_dir, output)
+        return result_file(work_dir, output, out_name)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
@@ -56,9 +62,11 @@ async def resize(file: UploadFile = File(...), width: int = Form(...), height: i
     work_dir = create_work_dir()
     try:
         source = await input_image(file, work_dir)
-        output = work_dir / f"resized{source.suffix.lower()}"
+        stem = Path(safe_upload_name(file.filename, "image")).stem
+        out_name = f"{stem}_resized{source.suffix.lower()}"
+        output = work_dir / out_name
         await asyncio.to_thread(resize_image, source, output, width, height, quality)
-        return result_file(work_dir, output)
+        return result_file(work_dir, output, out_name)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
@@ -77,10 +85,12 @@ async def crop(
     work_dir = create_work_dir()
     try:
         source = await input_image(file, work_dir)
+        stem = Path(safe_upload_name(file.filename, "image")).stem
         target = output_format.lower().lstrip(".") or "png"
-        output = work_dir / f"cropped.{target}"
+        out_name = f"{stem}_cropped.{target}"
+        output = work_dir / out_name
         await asyncio.to_thread(crop_image, source, output, x, y, width, height, target, quality)
-        return result_file(work_dir, output)
+        return result_file(work_dir, output, out_name)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
@@ -98,10 +108,12 @@ async def rotate(
     work_dir = create_work_dir()
     try:
         source = await input_image(file, work_dir)
+        stem = Path(safe_upload_name(file.filename, "image")).stem
         target = output_format.lower().lstrip(".") or "png"
-        output = work_dir / f"rotated.{target}"
+        out_name = f"{stem}_rotated.{target}"
+        output = work_dir / out_name
         await asyncio.to_thread(rotate_image, source, output, angle, flip_horizontal, flip_vertical, target, quality)
-        return result_file(work_dir, output)
+        return result_file(work_dir, output, out_name)
     except Exception:
         cleanup_work_dir(work_dir)
         raise

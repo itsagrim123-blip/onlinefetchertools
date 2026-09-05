@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse
 
 from app.errors import ClipFetchError, InvalidUrlError, to_http_exception
 from app.models import AnalyzeRequest, DownloadRequest, DownloadStatus, VideoMetadata
 from app.services.downloader import DownloadService, get_download_service
 from app.services.extractor import ExtractorService
 from app.utils.rate_limit import rate_limit_analyze, rate_limit_download
+from app.utils.responses import download_response
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -62,6 +62,6 @@ async def get_status(job_id: str) -> DownloadStatus:
 async def get_file(job_id: str):
     try:
         file_path = downloader.get_file_path(job_id)
-        return FileResponse(file_path, filename=file_path.name, media_type="application/octet-stream")
+        return download_response(file_path, filename=file_path.name)
     except ClipFetchError as exc:
         raise to_http_exception(exc)

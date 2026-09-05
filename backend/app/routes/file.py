@@ -10,6 +10,7 @@ from starlette.background import BackgroundTask
 from app.services.media_tools import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, convert_media, edit_video, extract_frame, video_to_gif
 from app.utils.concurrency import MEDIA_SEMAPHORE
 from app.utils.files import cleanup_work_dir, create_work_dir, safe_upload_name, save_upload
+from app.utils.responses import download_response
 
 router = APIRouter(prefix="/api/media", tags=["Media tools"])
 
@@ -21,11 +22,12 @@ async def convert(file: UploadFile = File(...), output_format: str = Form("mp4")
     try:
         source = work_dir / safe_upload_name(file.filename, "media")
         await save_upload(file, source, VIDEO_EXTENSIONS | AUDIO_EXTENSIONS)
+        stem = Path(safe_upload_name(file.filename, "media")).stem
         target_format = "mp3" if output_format == "audio" else output_format
-        output = work_dir / f"converted.{target_format.lstrip('.')}"
+        output = work_dir / f"{stem}_converted.{target_format.lstrip('.')}"
         async with MEDIA_SEMAPHORE:
             await asyncio.to_thread(convert_media, source, output, target_format)
-        return FileResponse(output, filename=output.name, media_type="application/octet-stream", background=BackgroundTask(cleanup_work_dir, work_dir))
+        return download_response(output, filename=output.name, work_dir=work_dir)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
@@ -62,12 +64,7 @@ async def edit(
                 include_audio=include_audio,
                 speed=speed,
             )
-        return FileResponse(
-            output,
-            filename=output.name,
-            media_type="application/octet-stream",
-            background=BackgroundTask(cleanup_work_dir, work_dir),
-        )
+        return download_response(output, filename=output.name, work_dir=work_dir)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
@@ -97,12 +94,7 @@ async def create_gif(
                 fps=fps,
                 width=width,
             )
-        return FileResponse(
-            output,
-            filename=output.name,
-            media_type="image/gif",
-            background=BackgroundTask(cleanup_work_dir, work_dir),
-        )
+        return download_response(output, filename=output.name, media_type="image/gif", work_dir=work_dir)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
@@ -124,12 +116,7 @@ async def get_frame(
         output = work_dir / f"{stem}_frame_{timestamp:.2f}.{ext}"
         async with MEDIA_SEMAPHORE:
             await asyncio.to_thread(extract_frame, source=source, output=output, timestamp=timestamp)
-        return FileResponse(
-            output,
-            filename=output.name,
-            media_type=media_type,
-            background=BackgroundTask(cleanup_work_dir, work_dir),
-        )
+        return download_response(output, filename=output.name, media_type=media_type, work_dir=work_dir)
     except Exception:
         cleanup_work_dir(work_dir)
         raise
