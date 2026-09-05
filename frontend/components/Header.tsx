@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { ChevronDown, Moon, Sparkles, SunMedium } from "lucide-react";
+import { ChevronDown, Clock, Moon, Sparkles, SunMedium } from "lucide-react";
 import { BackendStatus } from "@/components/BackendStatus";
 
 export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3" aria-label="Online Fetcher Tools home">
+        <Link href="/" className="flex items-center gap-3 shrink-0" aria-label="Online Fetcher Tools home">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 via-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/20">
             <Sparkles className="h-4 w-4 text-slate-950" />
           </div>
@@ -16,7 +16,13 @@ export function Header() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="hidden md:flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs text-slate-300 shadow-sm">
+          <Clock className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+          <span className="text-slate-400">Server Running Time:</span>
+          <span className="font-medium text-white">7:30 PM – 12:00 AM IST</span>
+        </div>
+
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           <BackendStatus />
           <details className="relative hidden sm:block">
             <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Tools <ChevronDown className="h-3.5 w-3.5" /></summary>
