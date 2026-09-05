@@ -1,0 +1,9 @@
+# Copy this file to config.yml after creating a named Cloudflare Tunnel.
+# Replace every <...> placeholder. Never commit the real credentials file.
+tunnel: <CLOUDFLARE_TUNNEL_UUID>
+credentials-file: C:\Users\<WINDOWS_USER>\.cloudflared\<CLOUDFLARE_TUNNEL_UUID>.json
+
+ingress:
+  - hostname: api.your-domain.example
+    service: http://localhost:8000
+  - service: http_status:404

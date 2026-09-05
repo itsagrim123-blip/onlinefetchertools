@@ -17,6 +17,7 @@ frontend/coverage/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # OS
 .DS_Store
@@ -26,3 +27,9 @@ Thumbs.db
 backend/downloads/
 backend/tmp/
 downloads/
+
+# Cloudflare Tunnel credentials and local named-tunnel configuration
+infra/cloudflared/config.yml
+infra/cloudflared/*.json
+cloudflared-windows-*.exe
+config.yml

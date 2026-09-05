@@ -8,7 +8,9 @@ client = TestClient(app)
 def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json()["health"] == "/api/health"
+    assert response.headers["content-type"].startswith("text/html")
+    assert "ClipFetch API" in response.text
+    assert "All Systems Operational" in response.text
 
 
 def test_health_endpoint():

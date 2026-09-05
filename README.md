@@ -221,6 +221,77 @@ FastAPI automatically exposes Swagger UI at:
 
 The health response reports API, yt-dlp, and FFmpeg availability without exposing secrets or filesystem paths.
 
+## Cloudflare Quick Tunnel to Vercel
+
+For free development/testing without a custom domain, use a Cloudflare Quick Tunnel. It forwards a temporary HTTPS `trycloudflare.com` URL to the local FastAPI server. Do not deploy the backend to Vercel, do not configure nameservers, and do not create a named tunnel.
+
+The connection is:
+
+```text
+Vercel frontend -> temporary HTTPS trycloudflare.com URL -> http://localhost:8000 -> FastAPI
+```
+
+Quick Tunnel URLs change whenever the tunnel restarts. The URL is intentionally never stored in source code. You copy the URL printed by the helper into Vercel's `NEXT_PUBLIC_API_URL` environment variable.
+
+### One-Time Manual Setup
+
+1. Install `cloudflared` for Windows from:
+   https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+2. Confirm that `cloudflared` is available on `PATH`:
+
+	```powershell
+	cloudflared --version
+	```
+
+3. No Cloudflare login, custom domain, nameserver change, named tunnel, or account authorization is required for Quick Tunnels.
+4. In Vercel Project Settings > Environment Variables, be ready to add `NEXT_PUBLIC_API_URL` for the Preview or Production environment. Its value will be the generated URL from the running Quick Tunnel.
+5. Set the backend `FRONTEND_ORIGIN` to the exact Vercel origin, for example `https://your-project.vercel.app`. The backend uses explicit CORS origins and never uses `*`.
+
+### Exact Windows Commands
+
+From the repository root, use separate VS Code terminals. PowerShell execution policy is bypassed only for the individual script process:
+
+```powershell
+# Terminal 1: start FastAPI
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1
+
+# Terminal 2: verify local FastAPI before exposing it
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-backend.ps1
+
+# Terminal 3: start the free temporary Quick Tunnel
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-cloudflared.ps1
+```
+
+The tunnel command used by the helper is exactly:
+
+```powershell
+cloudflared tunnel --url http://localhost:8000
+```
+
+The helper checks local `/api/health`, starts the tunnel, detects the generated `https://...trycloudflare.com` URL, and prints the exact Vercel value. Keep Terminal 3 running while the Vercel frontend uses the backend. The laptop must remain powered on, connected to the internet, and running FastAPI.
+
+### Vercel Environment Update
+
+After Terminal 3 prints the public URL:
+
+1. Open Vercel Project Settings > Environment Variables.
+2. Set `NEXT_PUBLIC_API_URL` to the complete printed `https://...trycloudflare.com` URL.
+3. Set `FRONTEND_ORIGIN` on the backend to the exact Vercel frontend origin.
+4. Redeploy the Vercel frontend so Next.js embeds the new public API URL.
+5. Repeat these steps whenever the Quick Tunnel restarts and its URL changes.
+
+The local frontend example remains `NEXT_PUBLIC_API_URL=http://localhost:8000`. The production example contains only a placeholder and never a real temporary URL.
+
+### Public Connection Health Checks
+
+Replace the placeholder with the URL printed by the tunnel:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-backend.ps1 -BackendUrl https://generated-name.trycloudflare.com
+```
+
+The script verifies the HTML dashboard at `/` and JSON health at `/api/health`. After it passes, test `/docs` and Analyze from the Vercel frontend.
+
 ## Development Workflow
 
 1. Create the virtual environment and install backend dependencies.
