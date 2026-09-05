@@ -6,7 +6,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
-from app.services.media_tools import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, convert_media
+from app.services.media_tools import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, convert_media, edit_video
 from app.utils.files import cleanup_work_dir, create_work_dir, save_upload, safe_upload_name
 
 router = APIRouter(prefix="/api/media", tags=["Media tools"])
@@ -23,6 +23,44 @@ async def convert(file: UploadFile = File(...), output_format: str = Form("mp4")
         output = work_dir / f"converted.{target_format.lstrip('.')}"
         convert_media(source, output, target_format)
         return FileResponse(output, filename=output.name, media_type="application/octet-stream", background=BackgroundTask(cleanup_work_dir, work_dir))
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
+
+@router.post("/edit")
+async def edit(
+    file: UploadFile = File(...),
+    start_time: str | None = Form(None),
+    end_time: str | None = Form(None),
+    resolution: str | None = Form(None),
+    quality: str = Form("high"),
+    output_format: str = Form("mp4"),
+    include_audio: bool = Form(True),
+):
+    work_dir = create_work_dir()
+    try:
+        source = work_dir / safe_upload_name(file.filename, "video")
+        await save_upload(file, source, VIDEO_EXTENSIONS)
+        target_format = output_format.lower().lstrip(".") or "mp4"
+        stem = Path(safe_upload_name(file.filename, "video")).stem
+        output = work_dir / f"{stem}_edited.{target_format}"
+        edit_video(
+            source=source,
+            output=output,
+            start_time=start_time,
+            end_time=end_time,
+            resolution=resolution,
+            quality=quality,
+            output_format=target_format,
+            include_audio=include_audio,
+        )
+        return FileResponse(
+            output,
+            filename=output.name,
+            media_type="application/octet-stream",
+            background=BackgroundTask(cleanup_work_dir, work_dir),
+        )
     except Exception:
         cleanup_work_dir(work_dir)
         raise

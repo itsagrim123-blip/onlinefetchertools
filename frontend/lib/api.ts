@@ -216,6 +216,7 @@ export function getDownloadFileUrl(jobId: string): string {
 }
 
 const toolEndpoints: Record<string, string> = {
+  "video-editor": "/api/media/edit",
   "image-compressor": "/api/image/compress",
   "image-resizer": "/api/image/resize",
   "jpg-to-png": "/api/image/convert",
@@ -247,6 +248,6 @@ export async function runFileTool(slug: string, body: FormData): Promise<{ blob:
     throw new Error(getApiErrorMessage(errorBody));
   }
   const disposition = response.headers.get("content-disposition") ?? "";
-  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? "clipfetch-download";
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? "download";
   return { blob: await response.blob(), filename };
 }

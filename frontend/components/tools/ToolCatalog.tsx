@@ -7,6 +7,7 @@ import { ToolCard } from "./ToolCard";
 const categories = [
   { name: "Video & Audio", accent: "from-cyan-400/20", tools: [
     { slug: "youtube", name: "YouTube Downloader", description: "Analyze metadata and download permitted media in your chosen format.", formats: "YouTube · MP4 · MP3", icon: "video" as const, featured: true },
+    { slug: "video-editor", name: "Video Editor", description: "Trim, cut, resize and edit videos", formats: "MP4 · WebM · MOV", icon: "editor" as const },
     { slug: "audio-extractor", name: "Extract Audio", description: "Pull an audio track from a video file for offline listening.", formats: "MP3 · WAV · M4A · OGG", icon: "audio" as const },
   ]},
   { name: "Images", accent: "from-blue-400/20", tools: [
@@ -29,5 +30,40 @@ const categories = [
 
 export function ToolCatalog() {
   const [query, setQuery] = useState("");
-  return <div className="space-y-16"><label className="mx-auto flex h-14 max-w-xl items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 text-left shadow-2xl shadow-cyan-950/20"><Search className="h-5 w-5 text-slate-500" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tools..." className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" aria-label="Search tools" /></label>{categories.map((category) => { const tools = category.tools.filter((tool) => `${tool.name} ${tool.description} ${category.name}`.toLowerCase().includes(query.toLowerCase())); if (!tools.length) return null; return <section key={category.name}><div className="mb-5 flex items-end justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Explore</p><h2 className="mt-2 text-2xl font-semibold text-white">{category.name}</h2></div><span className="text-xs text-slate-500">{tools.length} tools</span></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{tools.map((tool) => <ToolCard key={tool.slug} category={category.name} {...tool} />)}</div></section>; })}</div>;
+  return (
+    <div className="space-y-16">
+      <label className="mx-auto flex h-14 max-w-xl items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 text-left shadow-2xl shadow-cyan-950/20">
+        <Search className="h-5 w-5 text-slate-500" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search tools..."
+          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+          aria-label="Search tools"
+        />
+      </label>
+      {categories.map((category) => {
+        const tools = category.tools.filter((tool) =>
+          `${tool.name} ${tool.description} ${category.name}`.toLowerCase().includes(query.toLowerCase())
+        );
+        if (!tools.length) return null;
+        return (
+          <section key={category.name}>
+            <div className="mb-5 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Explore</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">{category.name}</h2>
+              </div>
+              <span className="text-xs text-slate-500">{tools.length} tools</span>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {tools.map((tool) => (
+                <ToolCard key={tool.slug} category={category.name} {...tool} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
 }

@@ -180,3 +180,126 @@ def clip_media(
             raise ClipFetchError("Failed to clip media file.", status_code=500)
 
     return output
+
+
+def edit_video(
+    source: Path,
+    output: Path,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    resolution: str | None = None,
+    quality: str = "high",
+    output_format: str = "mp4",
+    include_audio: bool = True,
+) -> None:
+    """
+    Edits a video file with trimming, resolution resizing, quality control,
+    and audio preservation:
+    - start_time / end_time: video cut range
+    - resolution: "original", "1080p", "720p", "480p", "1080x1920", "1080x1080", or custom WxH
+    - quality: "high" (CRF 18), "medium" (CRF 23), "low" (CRF 28)
+    - include_audio: whether to keep audio stream (True) or mute/strip (-an)
+    - output_format: "mp4", "webm", etc.
+    """
+    ffmpeg_cmd = shutil.which("ffmpeg")
+    if not ffmpeg_cmd:
+        raise ClipFetchError("FFmpeg is not installed on the backend server.", status_code=503)
+
+    target_ext = output_format.lower().lstrip(".")
+    if target_ext not in {"mp4", "webm", "mov", "mkv"}:
+        raise ClipFetchError("Unsupported output format for video editing", status_code=400)
+
+    # Validate that the source file is readable
+    validate_media_file(source, expect_video=True, expect_audio=False)
+
+    time_args: list[str] = []
+    if start_time and start_time.strip():
+        time_args.extend(["-ss", start_time.strip()])
+    if end_time and end_time.strip():
+        time_args.extend(["-to", end_time.strip()])
+
+    # Stream-copy fast-path: only possible if no scaling, default high quality, and keeping audio
+    is_scale_requested = bool(resolution and resolution.strip().lower() not in {"", "original", "none"})
+    is_lossless_trim = not is_scale_requested and quality.lower() == "high" and include_audio and target_ext == "mp4"
+
+    if is_lossless_trim and time_args:
+        copy_cmd = [
+            ffmpeg_cmd,
+            "-y",
+            *time_args,
+            "-i", str(source),
+            "-c", "copy",
+            "-map", "0",
+            "-avoid_negative_ts", "make_zero",
+            str(output),
+        ]
+        res = subprocess.run(copy_cmd, capture_output=True, text=True, timeout=300, check=False)
+        if res.returncode == 0 and output.exists() and output.stat().st_size > 0:
+            try:
+                validate_media_file(output, expect_video=True, expect_audio=False)
+                return
+            except Exception:
+                output.unlink(missing_ok=True)
+
+    # Resolution scaling filters
+    vf_filters: list[str] = []
+    if is_scale_requested and resolution:
+        res_clean = resolution.strip().lower()
+        if res_clean == "1080p":
+            vf_filters.append("scale=-2:1080")
+        elif res_clean == "720p":
+            vf_filters.append("scale=-2:720")
+        elif res_clean == "480p":
+            vf_filters.append("scale=-2:480")
+        elif res_clean == "360p":
+            vf_filters.append("scale=-2:360")
+        elif res_clean in {"1080x1920", "9:16"}:
+            vf_filters.append("scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2")
+        elif res_clean in {"1080x1080", "1:1"}:
+            vf_filters.append("scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2")
+        elif "x" in res_clean:
+            try:
+                w, h = [int(p) for p in res_clean.split("x", 1)]
+                if 64 <= w <= 4096 and 64 <= h <= 4096:
+                    vf_filters.append(f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2")
+            except ValueError:
+                pass
+
+    crf_map = {"high": "18", "medium": "23", "low": "28"}
+    crf_val = crf_map.get(quality.lower(), "20")
+
+    cmd = [
+        ffmpeg_cmd,
+        "-y",
+        *time_args,
+        "-i", str(source),
+    ]
+
+    if target_ext == "webm":
+        cmd.extend(["-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "0"])
+    else:
+        cmd.extend(["-c:v", "libx264", "-crf", crf_val, "-preset", "fast", "-pix_fmt", "yuv420p"])
+
+    if vf_filters:
+        cmd.extend(["-vf", ",".join(vf_filters)])
+
+    if not include_audio:
+        cmd.append("-an")
+    else:
+        if target_ext == "webm":
+            cmd.extend(["-c:a", "libopus", "-b:a", "128k"])
+        else:
+            cmd.extend(["-c:a", "aac", "-b:a", "192k"])
+
+    cmd.append(str(output))
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
+    except subprocess.TimeoutExpired as exc:
+        raise ClipFetchError("Video processing timed out", status_code=504) from exc
+
+    if result.returncode != 0 or not output.exists() or output.stat().st_size == 0:
+        logger.error("FFmpeg edit failed: %s", result.stderr)
+        raise ClipFetchError(_conversion_error(result.stderr), status_code=400)
+
+    validate_media_file(output, expect_video=True, expect_audio=include_audio)
