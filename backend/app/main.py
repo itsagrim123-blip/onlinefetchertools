@@ -6,13 +6,18 @@ import logging
 import time
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.routes.health import router as health_router
+from app.routes.image import router as image_router
+from app.routes.pdf import router as pdf_router
+from app.routes.file import router as file_router
 from app.routes.media import router as media_router
+from app.errors import ClipFetchError
 from app.services.cleanup import CleanupService
 
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +35,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="ClipFetch", version="1.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+
+
+@app.exception_handler(ClipFetchError)
+async def clipfetch_error_handler(_: Request, exc: ClipFetchError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.frontend_origins,
@@ -41,3 +53,6 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(media_router)
+app.include_router(image_router)
+app.include_router(pdf_router)
+app.include_router(file_router)

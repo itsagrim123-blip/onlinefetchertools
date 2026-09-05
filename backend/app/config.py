@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     frontend_origin: str = "http://localhost:3000,http://127.0.0.1:3000"
     max_download_size_mb: int = 2048
+    max_upload_size_mb: int = 200
     max_concurrent_downloads: int = 2
     temp_file_retention_minutes: int = 30
     max_analyze_requests_per_minute: int = 20

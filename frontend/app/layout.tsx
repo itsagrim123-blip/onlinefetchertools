@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ClipFetch",
-  description: "Download media simply and legally with a polished downloader UI.",
+  title: "ClipFetch — All your media & file tools",
+  description: "Download, convert, compress and manage files and media in one place.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

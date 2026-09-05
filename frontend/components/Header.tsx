@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Moon, Sparkles, SunMedium } from "lucide-react";
+import { ChevronDown, Moon, Sparkles, SunMedium } from "lucide-react";
 
 export function Header() {
   return (
@@ -16,6 +16,14 @@ export function Header() {
         </Link>
 
         <div className="flex items-center gap-3">
+          <details className="relative hidden sm:block">
+            <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Tools <ChevronDown className="h-3.5 w-3.5" /></summary>
+            <div className="absolute right-0 top-12 z-30 grid w-56 gap-1 rounded-2xl border border-white/10 bg-slate-900 p-2 shadow-2xl">
+              <Link href="/tools/youtube" className="rounded-xl px-3 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white">Video &amp; Audio</Link>
+              <Link href="/tools/image-compressor" className="rounded-xl px-3 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white">Image tools</Link>
+              <Link href="/tools/pdf-merge" className="rounded-xl px-3 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white">PDF tools</Link>
+            </div>
+          </details>
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-400/60 hover:bg-cyan-500/10"

@@ -116,3 +116,39 @@ export async function getDownloadStatus(jobId: string): Promise<DownloadStatus> 
 export function getDownloadFileUrl(jobId: string): string {
   return getApiUrl(`/api/download/${jobId}/file`);
 }
+
+const toolEndpoints: Record<string, string> = {
+  "image-compressor": "/api/image/compress",
+  "image-resizer": "/api/image/resize",
+  "jpg-to-png": "/api/image/convert",
+  "png-to-jpg": "/api/image/convert",
+  "webp-to-jpg": "/api/image/convert",
+  "webp-to-png": "/api/image/convert",
+  "image-to-pdf": "/api/pdf/from-images",
+  "pdf-merge": "/api/pdf/merge",
+  "pdf-split": "/api/pdf/split",
+  "pdf-compressor": "/api/pdf/compress",
+  "pdf-to-images": "/api/pdf/to-images",
+  "pdf-delete-pages": "/api/pdf/delete-pages",
+  "pdf-reorder": "/api/pdf/reorder",
+  "media-converter": "/api/media/convert",
+  "audio-extractor": "/api/media/extract-audio",
+};
+
+export async function runFileTool(slug: string, body: FormData): Promise<{ blob: Blob; filename: string }> {
+  const endpoint = toolEndpoints[slug];
+  if (!endpoint) throw new Error("This tool is not available.");
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl(endpoint), { method: "POST", body });
+  } catch {
+    throw new Error("Unable to reach the ClipFetch backend.");
+  }
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Processing failed" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? "clipfetch-download";
+  return { blob: await response.blob(), filename };
+}
