@@ -17,7 +17,7 @@ def test_finalize_download_accepts_media_containers(tmp_path, monkeypatch):
 
     filename = service._finalize_download(job)
 
-    assert filename == "clipfetch-download.ts"
+    assert filename == "video.ts"
     assert (tmp_path / "downloads" / filename).exists()
 
 
@@ -33,5 +33,20 @@ def test_finalize_download_finds_nested_yt_dlp_output(tmp_path, monkeypatch):
 
     filename = service._finalize_download(job)
 
-    assert filename == "clipfetch-download.mp4"
+    assert filename == "video.mp4"
+    assert (tmp_path / "downloads" / filename).exists()
+
+
+def test_finalize_download_uses_video_title_by_default(tmp_path, monkeypatch):
+    service = DownloadService()
+    job = DownloadJob(url="https://example.com/video", format_id="best", filename="clipfetch-download", temp_dir=str(tmp_path / "temp"))
+    temp_dir = Path(job.temp_dir)
+    temp_dir.mkdir()
+    (temp_dir / "My Video Title.mp4").write_bytes(b"media")
+
+    monkeypatch.setattr("app.services.downloader.get_settings", lambda: type("Settings", (), {"download_path": tmp_path / "downloads"})())
+
+    filename = service._finalize_download(job)
+
+    assert filename == "My_Video_Title.mp4"
     assert (tmp_path / "downloads" / filename).exists()

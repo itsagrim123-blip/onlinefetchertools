@@ -255,7 +255,8 @@ class DownloadService:
         for candidate in candidates:
             if candidate.suffix.lower() in ignored_suffixes:
                 continue
-            base_name = sanitize_filename(job.filename or candidate.stem, fallback="clipfetch-download")
+            requested_name = job.filename if job.filename != "clipfetch-download" else candidate.stem
+            base_name = sanitize_filename(requested_name, fallback="clipfetch-download")
             final_name = base_name + candidate.suffix.lower()
             final_path = download_root / final_name
             counter = 1
