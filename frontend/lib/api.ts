@@ -55,13 +55,96 @@ export type ApiError = {
   detail?: string | Array<{ msg?: string }>;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+export type BackendHealthResponse = {
+  status?: string;
+  service?: string;
+  dependencies?: Record<string, boolean>;
+  [key: string]: unknown;
+};
 
-function getApiUrl(path: string): string {
-  if (!API_BASE_URL) {
+export type HealthCheckResult = {
+  isOnline: boolean;
+  status: "online" | "offline";
+  data?: BackendHealthResponse;
+  error?: string;
+};
+
+export function getApiBaseUrl(): string {
+  const url = process.env.NEXT_PUBLIC_API_URL;
+  if (!url) return "";
+  return url.trim().replace(/\/$/, "");
+}
+
+export function getApiUrl(path: string): string {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
     throw new Error("Online Fetcher Tools API URL is not configured. Set NEXT_PUBLIC_API_URL.");
   }
-  return `${API_BASE_URL}${path}`;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${cleanPath}`;
+}
+
+export async function checkBackendHealth(timeoutMs: number = 8000): Promise<HealthCheckResult> {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    return {
+      isOnline: false,
+      status: "offline",
+      error: "Backend API URL is not configured (NEXT_PUBLIC_API_URL is missing).",
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}/api/health`, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    clearTimeout(timeoutId);
+
+    // Requirement: consider HTTP response successful only when endpoint returns a 2xx status
+    // and response can be parsed as JSON. Dependency fields (including FFmpeg) should NOT make
+    // server appear Offline.
+    if (!response.ok) {
+      return {
+        isOnline: false,
+        status: "offline",
+        error: `Server responded with status ${response.status}`,
+      };
+    }
+
+    const data = (await response.json()) as BackendHealthResponse;
+    if (typeof data !== "object" || data === null) {
+      return {
+        isOnline: false,
+        status: "offline",
+        error: "Invalid JSON response from health endpoint.",
+      };
+    }
+
+    return {
+      isOnline: true,
+      status: "online",
+      data,
+    };
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    const isTimeout =
+      (err instanceof DOMException && err.name === "AbortError") ||
+      (err instanceof Error && err.name === "AbortError");
+    return {
+      isOnline: false,
+      status: "offline",
+      error: isTimeout ? "Health check timed out." : "Unable to reach backend server.",
+    };
+  }
 }
 
 function getApiErrorMessage(errorBody: ApiError): string {

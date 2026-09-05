@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, Moon, Sparkles, SunMedium } from "lucide-react";
+import { BackendStatus } from "@/components/BackendStatus";
 
 export function Header() {
   return (
@@ -15,7 +16,8 @@ export function Header() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <BackendStatus />
           <details className="relative hidden sm:block">
             <summary className="flex cursor-pointer list-none items-center gap-1 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Tools <ChevronDown className="h-3.5 w-3.5" /></summary>
             <div className="absolute right-0 top-12 z-30 grid w-56 gap-1 rounded-2xl border border-white/10 bg-slate-900 p-2 shadow-2xl">
