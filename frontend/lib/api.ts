@@ -217,12 +217,18 @@ export function getDownloadFileUrl(jobId: string): string {
 
 const toolEndpoints: Record<string, string> = {
   "video-editor": "/api/media/edit",
+  "video-to-gif": "/api/media/video-to-gif",
   "image-compressor": "/api/image/compress",
   "image-resizer": "/api/image/resize",
+  "image-cropper": "/api/image/crop",
+  "image-rotator": "/api/image/rotate",
   "jpg-to-png": "/api/image/convert",
   "png-to-jpg": "/api/image/convert",
   "webp-to-jpg": "/api/image/convert",
   "webp-to-png": "/api/image/convert",
+  "jpg-to-webp": "/api/image/convert",
+  "png-to-webp": "/api/image/convert",
+  "heic-to-jpg": "/api/image/convert",
   "image-to-pdf": "/api/pdf/from-images",
   "pdf-merge": "/api/pdf/merge",
   "pdf-split": "/api/pdf/split",
@@ -230,8 +236,12 @@ const toolEndpoints: Record<string, string> = {
   "pdf-to-images": "/api/pdf/to-images",
   "pdf-delete-pages": "/api/pdf/delete-pages",
   "pdf-reorder": "/api/pdf/reorder",
+  "pdf-page-manager": "/api/pdf/manage",
+  "pdf-to-text": "/api/pdf/to-text",
   "media-converter": "/api/media/convert",
   "audio-extractor": "/api/media/extract-audio",
+  "zip-creator": "/api/file/create-zip",
+  "zip-extractor": "/api/file/extract-zip",
 };
 
 export async function runFileTool(slug: string, body: FormData): Promise<{ blob: Blob; filename: string }> {
@@ -250,5 +260,50 @@ export async function runFileTool(slug: string, body: FormData): Promise<{ blob:
   const disposition = response.headers.get("content-disposition") ?? "";
   const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? "download";
   return { blob: await response.blob(), filename };
+}
+
+export type PdfThumbnailsResponse = {
+  page_count: number;
+  thumbnails: string[];
+};
+
+export async function fetchPdfThumbnails(file: File): Promise<PdfThumbnailsResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(getApiUrl("/api/pdf/thumbnails"), {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Failed to generate page thumbnails" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+  return response.json() as Promise<PdfThumbnailsResponse>;
+}
+
+export type ZipEntry = {
+  name: string;
+  size: number;
+  compressed_size: number;
+  is_dir: boolean;
+};
+
+export type ZipInspectResponse = {
+  file_count: number;
+  entries: ZipEntry[];
+};
+
+export async function inspectZipArchive(file: File): Promise<ZipInspectResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(getApiUrl("/api/file/inspect-zip"), {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Failed to inspect ZIP archive" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+  return response.json() as Promise<ZipInspectResponse>;
 }
 

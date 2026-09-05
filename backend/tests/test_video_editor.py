@@ -109,3 +109,60 @@ def test_api_media_edit_rejects_unsupported_file():
     )
     assert response.status_code == 400
 
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="FFmpeg required")
+def test_edit_video_speed_changer(tmp_path):
+    source = tmp_path / "speed_sample.mp4"
+    make_test_video(source, duration=4)
+
+    output = tmp_path / "speed_2x.mp4"
+    edit_video(
+        source=source,
+        output=output,
+        speed=2.0,
+        include_audio=True,
+    )
+
+    assert output.exists()
+    validation = validate_media_file(output, expect_video=True, expect_audio=True)
+    assert validation["has_video"] is True
+    assert validation["has_audio"] is True
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="FFmpeg required")
+def test_video_to_gif_api(tmp_path):
+    source = tmp_path / "gif_sample.mp4"
+    make_test_video(source, duration=2)
+
+    with open(source, "rb") as f:
+        file_bytes = f.read()
+
+    response = client.post(
+        "/api/media/video-to-gif",
+        files={"file": ("test.mp4", BytesIO(file_bytes), "video/mp4")},
+        data={"fps": "10", "width": "320"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/gif"
+    assert response.content[:4] in {b"GIF8", b"GIF9"}
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="FFmpeg required")
+def test_extract_frame_api(tmp_path):
+    source = tmp_path / "frame_sample.mp4"
+    make_test_video(source, duration=2)
+
+    with open(source, "rb") as f:
+        file_bytes = f.read()
+
+    response = client.post(
+        "/api/media/extract-frame",
+        files={"file": ("test.mp4", BytesIO(file_bytes), "video/mp4")},
+        data={"timestamp": "1.0", "format": "jpg"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.content[:2] == b"\xff\xd8"
+

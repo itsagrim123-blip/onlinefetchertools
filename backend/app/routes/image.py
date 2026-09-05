@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from app.errors import ClipFetchError
-from app.services.image_tools import IMAGE_EXTENSIONS, compress_image, convert_image, resize_image
+from app.services.image_tools import IMAGE_EXTENSIONS, compress_image, convert_image, crop_image, resize_image, rotate_image
 from app.utils.files import cleanup_work_dir, create_work_dir, save_upload, safe_upload_name
 
 router = APIRouter(prefix="/api/image", tags=["Image tools"])
@@ -57,6 +57,49 @@ async def resize(file: UploadFile = File(...), width: int = Form(...), height: i
         source = await input_image(file, work_dir)
         output = work_dir / f"resized{source.suffix.lower()}"
         resize_image(source, output, width, height, quality)
+        return result_file(work_dir, output)
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
+
+@router.post("/crop")
+async def crop(
+    file: UploadFile = File(...),
+    x: int = Form(...),
+    y: int = Form(...),
+    width: int = Form(...),
+    height: int = Form(...),
+    output_format: str = Form("png"),
+    quality: int = Form(85),
+):
+    work_dir = create_work_dir()
+    try:
+        source = await input_image(file, work_dir)
+        target = output_format.lower().lstrip(".") or "png"
+        output = work_dir / f"cropped.{target}"
+        crop_image(source, output, x, y, width, height, target, quality)
+        return result_file(work_dir, output)
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
+
+@router.post("/rotate")
+async def rotate(
+    file: UploadFile = File(...),
+    angle: int = Form(90),
+    flip_horizontal: bool = Form(False),
+    flip_vertical: bool = Form(False),
+    output_format: str = Form("png"),
+    quality: int = Form(85),
+):
+    work_dir = create_work_dir()
+    try:
+        source = await input_image(file, work_dir)
+        target = output_format.lower().lstrip(".") or "png"
+        output = work_dir / f"rotated.{target}"
+        rotate_image(source, output, angle, flip_horizontal, flip_vertical, target, quality)
         return result_file(work_dir, output)
     except Exception:
         cleanup_work_dir(work_dir)

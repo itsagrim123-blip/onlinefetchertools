@@ -3,10 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
 
-from app.services.pdf_tools import compress_pdf, delete_pages, images_to_pdf, merge_pdfs, pdf_to_images, reorder_pages, split_pdf
+from app.services.pdf_tools import (
+    compress_pdf,
+    delete_pages,
+    generate_pdf_thumbnails,
+    images_to_pdf,
+    manage_pages,
+    merge_pdfs,
+    pdf_to_images,
+    pdf_to_text,
+    reorder_pages,
+    split_pdf,
+)
 from app.utils.files import cleanup_work_dir, create_work_dir, save_upload, safe_upload_name
 
 router = APIRouter(prefix="/api/pdf", tags=["PDF tools"])
@@ -117,6 +128,46 @@ async def reorder(file: UploadFile = File(...), order: str = Form(...)):
         output = work_dir / "pages-reordered.pdf"
         reorder_pages(source, output, order)
         return result_file(work_dir, output, "application/pdf")
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
+
+@router.post("/manage")
+async def manage(file: UploadFile = File(...), order: str = Form(...)):
+    work_dir = create_work_dir()
+    try:
+        source = await saved_pdf(file, work_dir)
+        output = work_dir / "pages-managed.pdf"
+        manage_pages(source, output, order)
+        return result_file(work_dir, output, "application/pdf")
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
+
+@router.post("/to-text")
+async def to_text(file: UploadFile = File(...)):
+    work_dir = create_work_dir()
+    try:
+        source = await saved_pdf(file, work_dir)
+        stem = Path(safe_upload_name(file.filename, "document")).stem
+        output = work_dir / f"{stem}.txt"
+        pdf_to_text(source, output)
+        return result_file(work_dir, output, "text/plain; charset=utf-8")
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
+
+@router.post("/thumbnails")
+async def thumbnails(file: UploadFile = File(...)):
+    work_dir = create_work_dir()
+    try:
+        source = await saved_pdf(file, work_dir)
+        thumbs = generate_pdf_thumbnails(source)
+        cleanup_work_dir(work_dir)
+        return JSONResponse({"page_count": len(thumbs), "thumbnails": thumbs})
     except Exception:
         cleanup_work_dir(work_dir)
         raise

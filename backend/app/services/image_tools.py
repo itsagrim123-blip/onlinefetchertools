@@ -4,17 +4,26 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+try:
+    import pillow_heif
+
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass
+
 from app.errors import ClipFetchError
 from app.utils.files import safe_upload_name
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 
 
 def open_image(source: Path) -> Image.Image:
     try:
         with Image.open(source) as image:
             image.verify()
-        return Image.open(source).convert("RGBA")
+        opened = Image.open(source)
+        opened = ImageOps.exif_transpose(opened)
+        return opened.convert("RGBA")
     except Exception as exc:
         raise ClipFetchError("The image is corrupted or unsupported", status_code=400) from exc
 
@@ -23,7 +32,7 @@ def convert_image(source: Path, output: Path, target_format: str, quality: int =
     image = open_image(source)
     target = target_format.lower().lstrip(".")
     if target in {"jpg", "jpeg"}:
-        image = ImageOps.exif_transpose(image).convert("RGB")
+        image = image.convert("RGB")
         image.save(output, "JPEG", quality=max(1, min(100, quality)), optimize=True)
     elif target == "png":
         image.save(output, "PNG", optimize=True)
@@ -52,3 +61,61 @@ def resize_image(source: Path, output: Path, width: int, height: int | None, qua
         image.save(output, "JPEG", quality=quality, optimize=True)
     else:
         image.save(output, target.upper() if target != "webp" else "WEBP", optimize=True)
+
+
+def crop_image(
+    source: Path,
+    output: Path,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    target_format: str = "png",
+    quality: int = 85,
+) -> None:
+    if width <= 0 or height <= 0:
+        raise ClipFetchError("Crop dimensions must be greater than zero", status_code=400)
+    image = open_image(source)
+    img_w, img_h = image.size
+    if x < 0 or y < 0 or x >= img_w or y >= img_h:
+        raise ClipFetchError("Crop coordinates are outside image bounds", status_code=400)
+    box = (x, y, min(img_w, x + width), min(img_h, y + height))
+    cropped = image.crop(box)
+    target = (target_format or source.suffix.lstrip(".") or "png").lower().lstrip(".")
+    if target in {"jpg", "jpeg"}:
+        cropped = cropped.convert("RGB")
+        cropped.save(output, "JPEG", quality=max(1, min(100, quality)), optimize=True)
+    elif target == "webp":
+        cropped.save(output, "WEBP", quality=max(1, min(100, quality)), method=6)
+    else:
+        cropped.save(output, "PNG", optimize=True)
+
+
+def rotate_image(
+    source: Path,
+    output: Path,
+    angle: int = 90,
+    flip_horizontal: bool = False,
+    flip_vertical: bool = False,
+    target_format: str = "png",
+    quality: int = 85,
+) -> None:
+    if angle not in {0, 90, 180, 270, 360}:
+        raise ClipFetchError("Angle must be 0, 90, 180, or 270 degrees", status_code=400)
+    image = open_image(source)
+    norm_angle = angle % 360
+    if norm_angle != 0:
+        image = image.rotate(-norm_angle, expand=True)
+    if flip_horizontal:
+        image = ImageOps.mirror(image)
+    if flip_vertical:
+        image = ImageOps.flip(image)
+
+    target = (target_format or source.suffix.lstrip(".") or "png").lower().lstrip(".")
+    if target in {"jpg", "jpeg"}:
+        image = image.convert("RGB")
+        image.save(output, "JPEG", quality=max(1, min(100, quality)), optimize=True)
+    elif target == "webp":
+        image.save(output, "WEBP", quality=max(1, min(100, quality)), method=6)
+    else:
+        image.save(output, "PNG", optimize=True)

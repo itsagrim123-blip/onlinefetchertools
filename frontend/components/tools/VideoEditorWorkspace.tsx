@@ -2,9 +2,11 @@
 
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Camera,
   CheckCircle2,
   Download,
   Film,
+  Gauge,
   Loader2,
   Play,
   Pause,
@@ -55,6 +57,12 @@ export function VideoEditorWorkspace() {
   const [quality, setQuality] = useState<string>("high");
   const [outputFormat, setOutputFormat] = useState<string>("mp4");
   const [includeAudio, setIncludeAudio] = useState<boolean>(true);
+  const [speed, setSpeed] = useState<number>(1.0);
+
+  // Frame extraction states
+  const [frameFormat, setFrameFormat] = useState<"jpg" | "png">("jpg");
+  const [capturedFrame, setCapturedFrame] = useState<{ url: string; name: string } | null>(null);
+  const [targetTimestampInput, setTargetTimestampInput] = useState<string>("");
 
   // Execution states
   const [busy, setBusy] = useState<boolean>(false);
@@ -161,6 +169,7 @@ export function VideoEditorWorkspace() {
       form.append("quality", quality);
       form.append("output_format", outputFormat);
       form.append("include_audio", includeAudio ? "true" : "false");
+      if (speed !== 1.0) form.append("speed", String(speed));
 
       const response = await runFileTool("video-editor", form);
       const url = URL.createObjectURL(response.blob);
@@ -176,6 +185,34 @@ export function VideoEditorWorkspace() {
     }
   };
 
+  const handleCaptureFrame = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const mime = frameFormat === "png" ? "image/png" : "image/jpeg";
+      const ext = frameFormat;
+      const dataUrl = canvas.toDataURL(mime, 0.95);
+      const cleanStem = file ? file.name.replace(/\.[^/.]+$/, "") : "video";
+      const filename = `${cleanStem}_frame_${currentTime.toFixed(1)}s.${ext}`;
+      setCapturedFrame({ url: dataUrl, name: filename });
+    } catch {
+      setError("Unable to capture frame directly from preview.");
+    }
+  };
+
+  const handleSeekToCustomTimestamp = () => {
+    const secs = parseSeconds(targetTimestampInput);
+    if (!isNaN(secs)) {
+      seekTo(secs);
+    }
+  };
+
   const resetAll = () => {
     setFile(null);
     setResult(null);
@@ -185,6 +222,9 @@ export function VideoEditorWorkspace() {
     setStartTime(0);
     setEndTime(0);
     setIsPlaying(false);
+    setSpeed(1.0);
+    setCapturedFrame(null);
+    setTargetTimestampInput("");
   };
 
   const cutDuration = Math.max(0, endTime - startTime);
@@ -351,6 +391,38 @@ export function VideoEditorWorkspace() {
               </div>
             </div>
 
+            {/* Playback Speed Changer */}
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">
+                  <Gauge className="h-3.5 w-3.5" /> Video Speed Changer
+                </span>
+                <span className="rounded-full bg-cyan-400/10 px-2.5 py-0.5 text-xs font-mono font-medium text-cyan-300 border border-cyan-400/20">
+                  {speed}× Playback
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setSpeed(s);
+                      if (videoRef.current) videoRef.current.playbackRate = s;
+                    }}
+                    className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                      speed === s
+                        ? "bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-md shadow-cyan-400/20"
+                        : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-cyan-400/40 hover:text-white"
+                    }`}
+                  >
+                    {s}×
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500">Audio will remain synchronized at all speeds upon export.</p>
+            </div>
+
             {/* Video Settings: Resolution, Quality, Audio, Format */}
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Resolution selector */}
@@ -416,6 +488,85 @@ export function VideoEditorWorkspace() {
                   </span>
                 </label>
               </div>
+            </div>
+
+            {/* Frame Extractor Feature */}
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">
+                  <Camera className="h-3.5 w-3.5" /> Video Frame Extractor
+                </span>
+                <span className="text-xs text-slate-400">
+                  Current: <span className="font-mono text-cyan-300">{formatSeconds(currentTime)}</span>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                  <input
+                    type="text"
+                    placeholder="Seek e.g. 01:23 or 15.5"
+                    value={targetTimestampInput}
+                    onChange={(e) => setTargetTimestampInput(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-xs text-white placeholder:text-slate-600 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSeekToCustomTimestamp}
+                    className="h-10 px-3 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-200 hover:bg-white/10"
+                  >
+                    Seek
+                  </button>
+                </div>
+                <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setFrameFormat("jpg")}
+                    className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
+                      frameFormat === "jpg" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    JPG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFrameFormat("png")}
+                    className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
+                      frameFormat === "png" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    PNG
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCaptureFrame}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-cyan-400/20 px-4 text-xs font-semibold text-cyan-300 border border-cyan-400/30 hover:bg-cyan-400/30 transition"
+                >
+                  <Camera className="h-3.5 w-3.5" /> Capture Frame
+                </button>
+              </div>
+
+              {capturedFrame && (
+                <div className="flex items-center gap-3 rounded-xl border border-cyan-400/30 bg-cyan-400/[0.06] p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={capturedFrame.url}
+                    alt="Captured frame preview"
+                    className="h-14 w-24 rounded-lg object-cover border border-white/10 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-white">Frame Captured!</p>
+                    <p className="truncate text-[11px] text-slate-400">{capturedFrame.name}</p>
+                  </div>
+                  <a
+                    href={capturedFrame.url}
+                    download={capturedFrame.name}
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-400 px-3 text-xs font-semibold text-slate-950 hover:bg-emerald-300 transition shrink-0"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Error Message */}

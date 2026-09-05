@@ -182,6 +182,91 @@ def clip_media(
     return output
 
 
+def _build_atempo_filter(speed: float) -> str:
+    factors: list[str] = []
+    curr = speed
+    while curr > 2.0:
+        factors.append("atempo=2.0")
+        curr /= 2.0
+    while curr < 0.5:
+        factors.append("atempo=0.5")
+        curr /= 0.5
+    factors.append(f"atempo={curr:.4f}")
+    return ",".join(factors)
+
+
+def video_to_gif(
+    source: Path,
+    output: Path,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    fps: int = 10,
+    width: int = 480,
+) -> None:
+    ffmpeg_cmd = shutil.which("ffmpeg")
+    if not ffmpeg_cmd:
+        raise ClipFetchError("FFmpeg is not installed on the backend server.", status_code=503)
+
+    validate_media_file(source, expect_video=True, expect_audio=False)
+
+    fps_val = max(1, min(30, int(fps)))
+    width_val = max(120, min(1080, int(width)))
+
+    time_args: list[str] = []
+    if start_time and str(start_time).strip():
+        time_args.extend(["-ss", str(start_time).strip()])
+    if end_time and str(end_time).strip():
+        time_args.extend(["-to", str(end_time).strip()])
+
+    filter_complex = f"[0:v] fps={fps_val},scale={width_val}:-1:flags=lanczos,split [a][b];[a] palettegen [p];[b][p] paletteuse"
+
+    cmd = [
+        ffmpeg_cmd,
+        "-y",
+        *time_args,
+        "-i", str(source),
+        "-filter_complex", filter_complex,
+        str(output),
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
+    except subprocess.TimeoutExpired as exc:
+        raise ClipFetchError("GIF creation timed out", status_code=504) from exc
+
+    if result.returncode != 0 or not output.exists() or output.stat().st_size == 0:
+        logger.error("FFmpeg video-to-gif failed: %s", result.stderr)
+        raise ClipFetchError(_conversion_error(result.stderr), status_code=400)
+
+
+def extract_frame(source: Path, output: Path, timestamp: float = 0.0) -> None:
+    ffmpeg_cmd = shutil.which("ffmpeg")
+    if not ffmpeg_cmd:
+        raise ClipFetchError("FFmpeg is not installed on the backend server.", status_code=503)
+
+    validate_media_file(source, expect_video=True, expect_audio=False)
+    ts = max(0.0, float(timestamp))
+
+    cmd = [
+        ffmpeg_cmd,
+        "-y",
+        "-ss", f"{ts:.3f}",
+        "-i", str(source),
+        "-frames:v", "1",
+        "-q:v", "2",
+        str(output),
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
+    except subprocess.TimeoutExpired as exc:
+        raise ClipFetchError("Frame extraction timed out", status_code=504) from exc
+
+    if result.returncode != 0 or not output.exists() or output.stat().st_size == 0:
+        logger.error("FFmpeg extract frame failed: %s", result.stderr)
+        raise ClipFetchError("Failed to extract frame from video", status_code=400)
+
+
 def edit_video(
     source: Path,
     output: Path,
@@ -191,15 +276,17 @@ def edit_video(
     quality: str = "high",
     output_format: str = "mp4",
     include_audio: bool = True,
+    speed: float = 1.0,
 ) -> None:
     """
     Edits a video file with trimming, resolution resizing, quality control,
-    and audio preservation:
+    playback speed adjustment, and audio preservation:
     - start_time / end_time: video cut range
     - resolution: "original", "1080p", "720p", "480p", "1080x1920", "1080x1080", or custom WxH
     - quality: "high" (CRF 18), "medium" (CRF 23), "low" (CRF 28)
     - include_audio: whether to keep audio stream (True) or mute/strip (-an)
     - output_format: "mp4", "webm", etc.
+    - speed: playback speed factor (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 4.0)
     """
     ffmpeg_cmd = shutil.which("ffmpeg")
     if not ffmpeg_cmd:
@@ -212,15 +299,20 @@ def edit_video(
     # Validate that the source file is readable
     validate_media_file(source, expect_video=True, expect_audio=False)
 
+    speed_val = float(speed)
+    if speed_val <= 0 or speed_val > 16.0:
+        raise ClipFetchError("Invalid playback speed. Must be between 0.1x and 16x.", status_code=400)
+
     time_args: list[str] = []
     if start_time and start_time.strip():
         time_args.extend(["-ss", start_time.strip()])
     if end_time and end_time.strip():
         time_args.extend(["-to", end_time.strip()])
 
-    # Stream-copy fast-path: only possible if no scaling, default high quality, and keeping audio
+    # Stream-copy fast-path: only possible if no scaling, default high quality, speed 1.0, and keeping audio
     is_scale_requested = bool(resolution and resolution.strip().lower() not in {"", "original", "none"})
-    is_lossless_trim = not is_scale_requested and quality.lower() == "high" and include_audio and target_ext == "mp4"
+    is_speed_changed = abs(speed_val - 1.0) > 0.001
+    is_lossless_trim = not is_scale_requested and not is_speed_changed and quality.lower() == "high" and include_audio and target_ext == "mp4"
 
     if is_lossless_trim and time_args:
         copy_cmd = [
@@ -241,7 +333,7 @@ def edit_video(
             except Exception:
                 output.unlink(missing_ok=True)
 
-    # Resolution scaling filters
+    # Video filters (scaling and speed)
     vf_filters: list[str] = []
     if is_scale_requested and resolution:
         res_clean = resolution.strip().lower()
@@ -265,6 +357,9 @@ def edit_video(
             except ValueError:
                 pass
 
+    if is_speed_changed:
+        vf_filters.append(f"setpts={1.0 / speed_val:.4f}*PTS")
+
     crf_map = {"high": "18", "medium": "23", "low": "28"}
     crf_val = crf_map.get(quality.lower(), "20")
 
@@ -286,6 +381,10 @@ def edit_video(
     if not include_audio:
         cmd.append("-an")
     else:
+        if is_speed_changed:
+            af_filter = _build_atempo_filter(speed_val)
+            cmd.extend(["-af", af_filter])
+
         if target_ext == "webm":
             cmd.extend(["-c:a", "libopus", "-b:a", "128k"])
         else:

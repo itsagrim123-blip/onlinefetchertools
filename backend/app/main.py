@@ -16,6 +16,7 @@ from app.routes.health import router as health_router
 from app.routes.image import router as image_router
 from app.routes.pdf import router as pdf_router
 from app.routes.file import router as file_router
+from app.routes.archive import router as archive_router
 from app.routes.media import router as media_router
 from app.errors import ClipFetchError
 from app.services.cleanup import CleanupService
@@ -56,3 +57,4 @@ app.include_router(media_router)
 app.include_router(image_router)
 app.include_router(pdf_router)
 app.include_router(file_router)
+app.include_router(archive_router)

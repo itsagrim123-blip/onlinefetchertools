@@ -14,3 +14,4 @@ ffmpeg-python==0.2.0
 Pillow==11.3.0
 pypdf==6.0.0
 PyMuPDF==1.26.4
+pillow-heif==1.6.0
