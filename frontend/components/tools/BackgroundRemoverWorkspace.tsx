@@ -16,6 +16,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { removeImageBackground } from "@/lib/api";
+import { useUISound } from "@/lib/sounds/useUISound";
 
 function formatSize(bytes: number): string {
   if (!bytes) return "0 B";
@@ -42,8 +43,10 @@ export function BackgroundRemoverWorkspace() {
 
   // Processing states
   const [busy, setBusy] = useState<boolean>(false);
+  const [isDraggingDrop, setIsDraggingDrop] = useState<boolean>(false);
   const [stageIndex, setStageIndex] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const { playUpload, playSuccess, playError, playDownload, playClick } = useUISound();
 
   // Result state
   const [result, setResult] = useState<{
@@ -81,7 +84,6 @@ export function BackgroundRemoverWorkspace() {
     return () => clearInterval(interval);
   }, [busy]);
 
-
   const handleFile = (chosen: File) => {
     setError(null);
     if (result?.url) URL.revokeObjectURL(result.url);
@@ -90,6 +92,7 @@ export function BackgroundRemoverWorkspace() {
     // Validate size (200MB max)
     const maxBytes = 200 * 1024 * 1024;
     if (chosen.size > maxBytes) {
+      playError();
       setError("File exceeds the 200 MB maximum size limit.");
       return;
     }
@@ -98,15 +101,18 @@ export function BackgroundRemoverWorkspace() {
     const ext = chosen.name.split(".").pop()?.toLowerCase();
     const validExtensions = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
     if (!ext || !validExtensions.includes(ext)) {
+      playError();
       setError("Unsupported format. Please choose a JPG, PNG, WebP, or HEIC image.");
       return;
     }
 
+    playUpload();
     setFile(chosen);
   };
 
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
+    setIsDraggingDrop(false);
     const dropped = event.dataTransfer.files?.[0];
     if (dropped) handleFile(dropped);
   };
@@ -123,6 +129,7 @@ export function BackgroundRemoverWorkspace() {
 
   const handleProcess = async () => {
     if (!file) return;
+    playClick();
     setStageIndex(0);
     setBusy(true);
     setError(null);
@@ -152,7 +159,9 @@ export function BackgroundRemoverWorkspace() {
         width: response.width || imgNaturalSize.width,
         height: response.height || imgNaturalSize.height,
       });
+      playSuccess();
     } catch (cause) {
+      playError();
       setError(
         cause instanceof Error
           ? cause.message
@@ -164,6 +173,7 @@ export function BackgroundRemoverWorkspace() {
   };
 
   const resetAll = () => {
+    playClick();
     if (result?.url) URL.revokeObjectURL(result.url);
     setFile(null);
     setResult(null);
@@ -223,8 +233,13 @@ export function BackgroundRemoverWorkspace() {
           /* ==================== UPLOAD STATE ==================== */
           <label
             onDrop={onDrop}
-            onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-56 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-5 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            onDragOver={(event) => { event.preventDefault(); setIsDraggingDrop(true); }}
+            onDragLeave={() => setIsDraggingDrop(false)}
+            className={`dropzone-interactive flex min-h-56 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed p-5 sm:px-6 text-center transition ${
+              isDraggingDrop
+                ? "border-cyan-300 bg-cyan-400/[0.12] scale-[1.01]"
+                : "border-cyan-400/30 bg-cyan-400/[0.04] hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            }`}
           >
             <input
               type="file"
@@ -233,7 +248,7 @@ export function BackgroundRemoverWorkspace() {
               accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/*"
               onChange={onChoose}
             />
-            <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300 border border-cyan-400/20">
+            <div className={`flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300 border border-cyan-400/20 transition-transform duration-200 ${isDraggingDrop ? "scale-110 -translate-y-1" : ""}`}>
               <UploadCloud className="h-6 w-6 sm:h-7 sm:w-7" />
             </div>
             <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">
@@ -565,10 +580,28 @@ export function BackgroundRemoverWorkspace() {
             {error && (
               <p
                 role="alert"
-                className="rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200"
+                className="animate-error-shake rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200"
               >
                 {error}
               </p>
+            )}
+
+            {/* Stage Progress Shimmer when Processing (No fake percentages) */}
+            {busy && (
+              <div className="animate-subtle-enter space-y-2 rounded-2xl border border-cyan-500/30 bg-slate-950/70 p-3.5">
+                <div className="flex items-center justify-between text-xs text-slate-300">
+                  <span className="flex items-center gap-2 font-medium text-cyan-300">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {PROCESSING_STAGES[stageIndex]}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Step {stageIndex + 1} of {PROCESSING_STAGES.length}
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                  <div className="h-full w-full shimmer-bar rounded-full" />
+                </div>
+              </div>
             )}
 
             {/* Action Button: Remove Background */}
@@ -576,12 +609,12 @@ export function BackgroundRemoverWorkspace() {
               type="button"
               onClick={handleProcess}
               disabled={busy}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              className="btn-interactive inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>{PROCESSING_STAGES[stageIndex]}</span>
+                  <span>Processing image...</span>
                 </>
               ) : (
                 <>
@@ -593,8 +626,8 @@ export function BackgroundRemoverWorkspace() {
 
             {/* Download & Completion Card */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
+              <div className="animate-subtle-enter flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
+                <CheckCircle2 className="animate-check-pop h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Background removed successfully!</p>
                   <p className="truncate text-xs text-slate-400">
@@ -606,14 +639,15 @@ export function BackgroundRemoverWorkspace() {
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition shadow-lg shadow-emerald-950/20"
+                    onClick={() => playDownload()}
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-200 active:scale-[0.98] transition shadow-lg shadow-emerald-950/20"
                   >
                     <Download className="h-4 w-4" /> Download PNG
                   </a>
                   <button
                     type="button"
                     onClick={resetAll}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10 active:scale-[0.98] transition"
                   >
                     Another image
                   </button>

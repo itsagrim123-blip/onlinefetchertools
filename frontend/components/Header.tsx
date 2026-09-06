@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronDown, Clock, Sparkles } from "lucide-react";
 import { BackendStatus } from "@/components/BackendStatus";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SoundToggle } from "@/components/SoundToggle";
 
 export function Header() {
   return (
@@ -42,6 +43,7 @@ export function Header() {
               </div>
             </div>
           </details>
+          <SoundToggle />
           <ThemeToggle />
           <a
             href="https://github.com/itsagrim123-blip/onlinefetchertools"

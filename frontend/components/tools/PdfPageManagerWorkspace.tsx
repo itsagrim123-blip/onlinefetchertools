@@ -15,6 +15,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { fetchPdfThumbnails, runFileTool } from "@/lib/api";
+import { useUISound } from "@/lib/sounds/useUISound";
 
 type PageItem = {
   originalIndex: number; // 1-based index
@@ -36,13 +37,16 @@ export function PdfPageManagerWorkspace() {
 
   const [loadingThumbs, setLoadingThumbs] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
+  const { playUpload, playSuccess, playError, playDownload, playClick } = useUISound();
 
   const handleFileSelect = async (selectedFile: File) => {
     setError(null);
     setResult(null);
     setFile(selectedFile);
+    playUpload();
     setLoadingThumbs(true);
 
     try {
@@ -68,6 +72,7 @@ export function PdfPageManagerWorkspace() {
 
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
+    setIsDragging(false);
     const dropped = event.dataTransfer.files?.[0];
     if (dropped) handleFileSelect(dropped);
   };
@@ -79,6 +84,7 @@ export function PdfPageManagerWorkspace() {
 
   const movePage = (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= pages.length) return;
+    playClick();
     const updated = [...pages];
     const [moved] = updated.splice(fromIndex, 1);
     updated.splice(toIndex, 0, moved);
@@ -87,14 +93,17 @@ export function PdfPageManagerWorkspace() {
 
   const deletePage = (indexToRemove: number) => {
     if (pages.length <= 1) {
+      playError();
       setError("You must keep at least one page in the document.");
       return;
     }
+    playClick();
     setError(null);
     setPages(pages.filter((_, idx) => idx !== indexToRemove));
   };
 
   const resetPages = () => {
+    playClick();
     setPages([...originalPages]);
     setError(null);
     setResult(null);
@@ -116,6 +125,7 @@ export function PdfPageManagerWorkspace() {
 
   const handleExport = async () => {
     if (!file || !pages.length) return;
+    playClick();
     setBusy(true);
     setError(null);
     setResult(null);
@@ -136,7 +146,9 @@ export function PdfPageManagerWorkspace() {
         name: response.filename,
         size: response.blob.size,
       });
+      playSuccess();
     } catch (cause) {
+      playError();
       setError(cause instanceof Error ? cause.message : "Failed to export modified PDF.");
     } finally {
       setBusy(false);
@@ -149,11 +161,16 @@ export function PdfPageManagerWorkspace() {
         {!file ? (
           <label
             onDrop={onDrop}
-            onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            className={`dropzone-interactive flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed p-4 sm:px-6 text-center transition ${
+              isDragging
+                ? "border-cyan-300 bg-cyan-400/[0.12] scale-[1.01]"
+                : "border-cyan-400/30 bg-cyan-400/[0.04] hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            }`}
           >
             <input type="file" className="sr-only" accept=".pdf" onChange={onChoose} />
-            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
+            <UploadCloud className={`h-8 w-8 sm:h-10 sm:w-10 text-cyan-300 transition-transform duration-200 ${isDragging ? "scale-110 -translate-y-1" : ""}`} />
             <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">Choose a PDF to manage pages</h2>
             <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">Drag &amp; drop or click to upload your document</p>
             <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-400">
@@ -283,7 +300,7 @@ export function PdfPageManagerWorkspace() {
             )}
 
             {error && (
-              <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200">
+              <p role="alert" className="animate-error-shake rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200">
                 {error}
               </p>
             )}
@@ -293,7 +310,7 @@ export function PdfPageManagerWorkspace() {
               type="button"
               onClick={handleExport}
               disabled={busy || loadingThumbs || pages.length === 0}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-interactive inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy ? (
                 <>
@@ -308,8 +325,8 @@ export function PdfPageManagerWorkspace() {
 
             {/* Result */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
+              <div className="animate-subtle-enter flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
+                <CheckCircle2 className="animate-check-pop h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Your PDF is ready!</p>
                   <p className="truncate text-xs text-slate-400">
@@ -320,17 +337,19 @@ export function PdfPageManagerWorkspace() {
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
+                    onClick={() => playDownload()}
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 active:scale-[0.98] transition shadow-md shadow-emerald-950/20"
                   >
                     <Download className="h-4 w-4" /> Download
                   </a>
                   <button
                     type="button"
                     onClick={() => {
+                      playClick();
                       if (result?.url) URL.revokeObjectURL(result.url);
                       setResult(null);
                     }}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10 active:scale-[0.98] transition"
                   >
                     Manage more
                   </button>

@@ -14,6 +14,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { runFileTool } from "@/lib/api";
+import { useUISound } from "@/lib/sounds/useUISound";
 
 function formatSize(bytes: number): string {
   if (!bytes) return "0 B";
@@ -46,8 +47,10 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
   const [outputFormat, setOutputFormat] = useState<string>("png");
   const [quality, setQuality] = useState<number>(85);
   const [busy, setBusy] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
+  const { playUpload, playSuccess, playError, playDownload, playClick, playToggle } = useUISound();
 
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -69,10 +72,12 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
     setRotation(0);
     setFlipH(false);
     setFlipV(false);
+    playUpload();
   };
 
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
+    setIsDragging(false);
     const dropped = event.dataTransfer.files?.[0];
     if (dropped) handleFile(dropped);
   };
@@ -128,6 +133,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
 
   const handleProcess = async () => {
     if (!file) return;
+    playClick();
     setBusy(true);
     setError(null);
     setResult(null);
@@ -164,7 +170,9 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
         name: response.filename,
         size: response.blob.size,
       });
+      playSuccess();
     } catch (cause) {
+      playError();
       setError(cause instanceof Error ? cause.message : "Processing failed.");
     } finally {
       setBusy(false);
@@ -172,6 +180,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
   };
 
   const resetAll = () => {
+    playClick();
     if (result?.url) URL.revokeObjectURL(result.url);
     setFile(null);
     setResult(null);
@@ -187,11 +196,16 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
         {!file ? (
           <label
             onDrop={onDrop}
-            onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            className={`dropzone-interactive flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed p-4 sm:px-6 text-center transition ${
+              isDragging
+                ? "border-cyan-300 bg-cyan-400/[0.12] scale-[1.01]"
+                : "border-cyan-400/30 bg-cyan-400/[0.04] hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            }`}
           >
             <input type="file" className="sr-only" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/*" onChange={onChoose} />
-            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
+            <UploadCloud className={`h-8 w-8 sm:h-10 sm:w-10 text-cyan-300 transition-transform duration-200 ${isDragging ? "scale-110 -translate-y-1" : ""}`} />
             <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">
               {isCropper ? "Choose an image to crop" : "Choose an image to rotate & flip"}
             </h2>
@@ -219,7 +233,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
               <button
                 type="button"
                 onClick={resetAll}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white"
+                className="btn-interactive inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Choose another
               </button>
@@ -261,8 +275,11 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                     <button
                       key={ratio}
                       type="button"
-                      onClick={() => applyAspectRatio(ratio)}
-                      className={`flex-1 sm:flex-initial min-w-[56px] text-center rounded-xl px-3.5 py-1.5 text-xs font-semibold uppercase transition ${
+                      onClick={() => {
+                        playClick();
+                        applyAspectRatio(ratio);
+                      }}
+                      className={`btn-interactive flex-1 sm:flex-initial min-w-[56px] text-center rounded-xl px-3.5 py-1.5 text-xs font-semibold uppercase transition ${
                         aspectRatio === ratio
                           ? "bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/20"
                           : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-cyan-400/40"
@@ -334,29 +351,41 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setRotation((r) => (r + 90) % 360)}
-                    className="flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
+                    onClick={() => {
+                      playClick();
+                      setRotation((r) => (r + 90) % 360);
+                    }}
+                    className="btn-interactive flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
                   >
                     <RotateCw className="h-3.5 w-3.5 text-cyan-300" /> Rotate 90° CW
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRotation((r) => (r + 270) % 360)}
-                    className="flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
+                    onClick={() => {
+                      playClick();
+                      setRotation((r) => (r + 270) % 360);
+                    }}
+                    className="btn-interactive flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
                   >
                     <RotateCcw className="h-3.5 w-3.5 text-cyan-300" /> Rotate 90° CCW
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRotation((r) => (r + 180) % 360)}
-                    className="flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
+                    onClick={() => {
+                      playClick();
+                      setRotation((r) => (r + 180) % 360);
+                    }}
+                    className="btn-interactive flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/40 hover:text-white transition"
                   >
                     <RotateCw className="h-3.5 w-3.5 text-cyan-300" /> Rotate 180°
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFlipH((f) => !f)}
-                    className={`flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
+                    onClick={() => {
+                      playToggle();
+                      setFlipH((f) => !f);
+                    }}
+                    className={`btn-interactive flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
                       flipH
                         ? "border-cyan-400 bg-cyan-400/10 text-cyan-300"
                         : "border-white/10 bg-slate-900/60 text-slate-200 hover:border-cyan-400/40"
@@ -366,8 +395,11 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFlipV((f) => !f)}
-                    className={`flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
+                    onClick={() => {
+                      playToggle();
+                      setFlipV((f) => !f);
+                    }}
+                    className={`btn-interactive flex-1 sm:flex-initial min-w-[130px] justify-center inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
                       flipV
                         ? "border-cyan-400 bg-cyan-400/10 text-cyan-300"
                         : "border-white/10 bg-slate-900/60 text-slate-200 hover:border-cyan-400/40"
@@ -408,7 +440,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
             </div>
 
             {error && (
-              <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200">
+              <p role="alert" className="animate-error-shake rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200">
                 {error}
               </p>
             )}
@@ -418,7 +450,7 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
               type="button"
               onClick={handleProcess}
               disabled={busy}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-interactive inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy ? (
                 <>
@@ -437,8 +469,8 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
 
             {/* Result card */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
+              <div className="animate-subtle-enter flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
+                <CheckCircle2 className="animate-check-pop h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Your edited image is ready!</p>
                   <p className="truncate text-xs text-slate-400">
@@ -449,17 +481,19 @@ export function PhotoEditorWorkspace({ slug }: { slug: string }) {
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
+                    onClick={() => playDownload()}
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
                   >
                     <Download className="h-4 w-4" /> Download
                   </a>
                   <button
                     type="button"
                     onClick={() => {
+                      playClick();
                       if (result?.url) URL.revokeObjectURL(result.url);
                       setResult(null);
                     }}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
                   >
                     Edit again
                   </button>

@@ -16,6 +16,7 @@ import {
   Video,
 } from "lucide-react";
 import { analyzeUrl, createDownload, getDownloadFileUrl, getDownloadStatus, type VideoMetadata } from "@/lib/api";
+import { useUISound } from "@/lib/sounds/useUISound";
 
 type DownloadTab = "video" | "audio" | "subtitles";
 
@@ -23,6 +24,7 @@ export function DownloaderCard() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const { playSuccess, playError, playDownload, playClick } = useUISound();
   const [error, setError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<string>("");
@@ -75,12 +77,16 @@ export function DownloaderCard() {
 
         if (statusResponse.status === "complete" || statusResponse.status === "failed") {
           setIsDownloading(false);
-          if (statusResponse.status === "failed") {
+          if (statusResponse.status === "complete") {
+            playSuccess();
+          } else if (statusResponse.status === "failed") {
+            playError();
             setError(statusResponse.error ?? "Download failed");
           }
           clearInterval(interval);
         }
       } catch {
+        playError();
         setError("Unable to fetch download status.");
         setIsDownloading(false);
         clearInterval(interval);
@@ -88,11 +94,12 @@ export function DownloaderCard() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [jobId, isDownloading]);
+  }, [jobId, isDownloading, playSuccess, playError]);
 
   const handleAnalyze = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     if (!url.trim()) return;
+    playClick();
     setLoading(true);
     setStatus("Analyzing");
     setError(null);
@@ -111,6 +118,7 @@ export function DownloaderCard() {
       setLanguageQuery("");
       setStatus("Ready to download");
     } catch (err) {
+      playError();
       setError(err instanceof Error ? err.message : "Unable to analyze this URL.");
       setStatus("Failed");
     } finally {
@@ -120,7 +128,7 @@ export function DownloaderCard() {
 
   const handleDownload = async () => {
     if (!metadata || !selectedFormat || !url.trim()) return;
-
+    playClick();
     setError(null);
     setStatus("Preparing");
     setDownloadProgress(0);
@@ -131,6 +139,7 @@ export function DownloaderCard() {
       setJobId(result.job_id);
       setStatus("Queued");
     } catch (err) {
+      playError();
       setError(err instanceof Error ? err.message : "Download failed");
       setStatus("Failed");
       setIsDownloading(false);
@@ -158,8 +167,11 @@ export function DownloaderCard() {
             <div className="flex items-center gap-2 md:contents">
               <button
                 type="button"
-                onClick={() => setUrl("")}
-                className="inline-flex h-12 sm:h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10 shrink-0"
+                onClick={() => {
+                  playClick();
+                  setUrl("");
+                }}
+                className="btn-interactive inline-flex h-12 sm:h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10 active:scale-[0.98] shrink-0"
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="ml-2 hidden xs:inline sm:inline">Clear</span>
@@ -167,7 +179,7 @@ export function DownloaderCard() {
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className="inline-flex h-12 sm:h-14 flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 md:flex-initial"
+                className="btn-interactive inline-flex h-12 sm:h-14 flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:flex-initial"
               >
                 {loading ? (
                   <>
@@ -186,7 +198,7 @@ export function DownloaderCard() {
         </form>
 
         {error && (
-          <div role="alert" className="mt-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          <div role="alert" className="animate-error-shake mt-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -252,7 +264,12 @@ export function DownloaderCard() {
               </div>
             )}
 
-            <button type="button" onClick={handleDownload} disabled={!metadata || !selectedFormat || loading || isDownloading || activeTab === "subtitles"} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45">
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={!metadata || !selectedFormat || loading || isDownloading || activeTab === "subtitles"}
+              className="btn-interactive inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+            >
               {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {isDownloading ? "Preparing download..." : activeTab === "audio" ? "Download Audio (MP3)" : "Download Video (MP4)"}
             </button>
@@ -268,7 +285,8 @@ export function DownloaderCard() {
             <a
               href={finalDownloadUrl}
               download={downloadInfo?.filename || (activeTab === "audio" ? "audio.mp3" : "video.mp4")}
-              className="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110"
+              onClick={() => playDownload()}
+              className="btn-interactive inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 px-5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110 active:scale-[0.98]"
             >
               <Download className="mr-2 h-4 w-4" />
               Download file
@@ -277,13 +295,13 @@ export function DownloaderCard() {
         </div>
 
         {(isDownloading || status === "complete" || status === "failed") && (
-          <div className="mt-6 space-y-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+          <div className="animate-subtle-enter mt-6 space-y-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
             <div className="flex items-center justify-between text-sm text-slate-300">
               <span>{status || "Preparing"}</span>
               <span>{downloadProgress}%</span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-500" style={{ width: `${downloadProgress}%` }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-500 transition-all duration-300 ease-out" style={{ width: `${downloadProgress}%` }} />
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-400">
               {downloadInfo?.downloaded_size ? <span>Downloaded: {downloadInfo.downloaded_size}</span> : null}

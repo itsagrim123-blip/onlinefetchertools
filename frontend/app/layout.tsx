@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { BackendStatusProvider } from "@/components/BackendStatusProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { SoundProvider } from "@/lib/sounds/SoundContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,7 +61,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="min-h-full w-full max-w-full overflow-x-hidden bg-slate-950 text-slate-100 transition-colors duration-200">
         <ThemeProvider>
-          <BackendStatusProvider>{children}</BackendStatusProvider>
+          <SoundProvider>
+            <BackendStatusProvider>{children}</BackendStatusProvider>
+          </SoundProvider>
         </ThemeProvider>
       </body>
     </html>

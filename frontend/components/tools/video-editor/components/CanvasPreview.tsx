@@ -97,7 +97,10 @@ export function CanvasPreview({
 
   const currentVideoSrcRef = useRef<string | null>(null);
   const isPlayingRef = useRef<boolean>(isPlaying);
-  isPlayingRef.current = isPlaying;
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // 1. Sync Video/Audio Sources and Volumes (without forced seeks during playback)
   useEffect(() => {

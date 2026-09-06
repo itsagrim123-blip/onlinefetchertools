@@ -73,8 +73,8 @@ export function ToolCatalog() {
               <span className="text-xs text-slate-500 shrink-0">{tools.length} tools</span>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tools.map((tool) => (
-                <ToolCard key={tool.slug} category={category.name} {...tool} />
+              {tools.map((tool, idx) => (
+                <ToolCard key={tool.slug} category={category.name} index={idx} {...tool} />
               ))}
             </div>
           </section>

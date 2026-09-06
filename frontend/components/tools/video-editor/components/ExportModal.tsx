@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ExportSettings, VideoProject } from "../types";
 import { formatBytes } from "../state/projectDefaults";
+import { useUISound } from "@/lib/sounds/useUISound";
 
 interface ExportModalProps {
   project: VideoProject;
@@ -32,10 +33,12 @@ export function ExportModal({
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
+  const { playSuccess, playError, playDownload, playClick } = useUISound();
 
   if (!isOpen) return null;
 
   const handleStartExport = async () => {
+    playClick();
     setIsExporting(true);
     setError(null);
     try {
@@ -47,8 +50,10 @@ export function ExportModal({
       });
       if (res) {
         setResult(res);
+        playSuccess();
       }
     } catch (err: unknown) {
+      playError();
       const errorMsg = err instanceof Error ? err.message : "Failed to export project.";
       setError(errorMsg);
     } finally {
@@ -58,12 +63,13 @@ export function ExportModal({
 
   const handleClose = () => {
     if (isExporting) return;
+    playClick();
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-5 text-white shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-subtle-enter">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-5 text-white shadow-2xl space-y-4 animate-modal-enter">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
@@ -83,9 +89,9 @@ export function ExportModal({
 
         {result ? (
           /* Rendered Result View */
-          <div className="space-y-4 py-2">
+          <div className="animate-subtle-enter space-y-4 py-2">
             <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4">
-              <CheckCircle2 className="h-8 w-8 text-emerald-300 shrink-0" />
+              <CheckCircle2 className="animate-check-pop h-8 w-8 text-emerald-300 shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white">Export Finished!</p>
                 <p className="truncate text-xs text-slate-400">
@@ -97,15 +103,19 @@ export function ExportModal({
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setResult(null)}
-                className="h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10"
+                onClick={() => {
+                  playClick();
+                  setResult(null);
+                }}
+                className="btn-interactive h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10 active:scale-[0.98]"
               >
                 Export Again
               </button>
               <a
                 href={result.url}
                 download={result.name}
-                className="inline-flex h-10 px-5 items-center justify-center gap-2 rounded-xl bg-emerald-400 text-xs font-semibold text-slate-950 hover:bg-emerald-300 transition"
+                onClick={() => playDownload()}
+                className="btn-interactive inline-flex h-10 px-5 items-center justify-center gap-2 rounded-xl bg-emerald-400 text-xs font-semibold text-slate-950 hover:bg-emerald-300 active:scale-[0.98] transition shadow-md shadow-emerald-950/30"
               >
                 <Download className="h-4 w-4" /> Download Video
               </a>
@@ -205,7 +215,7 @@ export function ExportModal({
 
             {/* Error banner */}
             {error && (
-              <div className="p-3 rounded-xl border border-red-400/30 bg-red-400/10 text-xs text-red-200">
+              <div className="animate-error-shake p-3 rounded-xl border border-red-400/30 bg-red-400/10 text-xs text-red-200">
                 {error}
               </div>
             )}
@@ -216,7 +226,7 @@ export function ExportModal({
                 type="button"
                 onClick={handleClose}
                 disabled={isExporting}
-                className="h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10 disabled:opacity-40"
+                className="btn-interactive h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10 active:scale-[0.98] disabled:opacity-40"
               >
                 Cancel
               </button>
@@ -224,7 +234,7 @@ export function ExportModal({
                 type="button"
                 onClick={handleStartExport}
                 disabled={isExporting}
-                className="inline-flex h-10 px-5 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-xs font-semibold text-slate-950 hover:brightness-110 transition disabled:opacity-40"
+                className="btn-interactive inline-flex h-10 px-5 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-xs font-semibold text-slate-950 hover:brightness-110 active:scale-[0.98] transition disabled:opacity-40"
               >
                 {isExporting ? (
                   <>

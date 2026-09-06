@@ -9,6 +9,8 @@ import { ZipExtractorWorkspace } from "@/components/tools/ZipExtractorWorkspace"
 import { BackgroundRemoverWorkspace } from "@/components/tools/BackgroundRemoverWorkspace";
 import { DownloaderCard } from "@/components/DownloaderCard";
 import { BackendStatus } from "@/components/BackendStatus";
+import { SoundToggle } from "@/components/SoundToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const toolTitles: Record<string, string> = {
   youtube: "YouTube Downloader",
@@ -77,6 +79,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
               <span className="font-medium text-white">7:30 PM – 12:00 AM IST</span>
             </div>
             <BackendStatus />
+            <SoundToggle />
+            <ThemeToggle />
           </div>
         </div>
         {/* Mobile Server Running Time */}

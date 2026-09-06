@@ -14,6 +14,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { inspectZipArchive, runFileTool, ZipEntry } from "@/lib/api";
+import { useUISound } from "@/lib/sounds/useUISound";
 
 function formatSize(bytes: number): string {
   if (!bytes) return "0 B";
@@ -27,19 +28,23 @@ export function ZipExtractorWorkspace() {
   const [entries, setEntries] = useState<ZipEntry[]>([]);
   const [loadingInspect, setLoadingInspect] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
+  const { playUpload, playSuccess, playError, playDownload, playClick } = useUISound();
 
   const handleFileSelect = async (selected: File) => {
     setError(null);
     setResult(null);
     setFile(selected);
+    playUpload();
     setLoadingInspect(true);
 
     try {
       const data = await inspectZipArchive(selected);
       setEntries(data.entries);
     } catch (cause) {
+      playError();
       setError(cause instanceof Error ? cause.message : "Failed to inspect ZIP archive.");
       setEntries([]);
     } finally {
@@ -49,6 +54,7 @@ export function ZipExtractorWorkspace() {
 
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
+    setIsDragging(false);
     const dropped = event.dataTransfer.files?.[0];
     if (dropped) handleFileSelect(dropped);
   };
@@ -60,6 +66,7 @@ export function ZipExtractorWorkspace() {
 
   const handleExtract = async () => {
     if (!file) return;
+    playClick();
     setBusy(true);
     setError(null);
     setResult(null);
@@ -78,7 +85,9 @@ export function ZipExtractorWorkspace() {
         name: response.filename,
         size: response.blob.size,
       });
+      playSuccess();
     } catch (cause) {
+      playError();
       setError(cause instanceof Error ? cause.message : "Failed to extract archive.");
     } finally {
       setBusy(false);
@@ -93,11 +102,16 @@ export function ZipExtractorWorkspace() {
         {!file ? (
           <label
             onDrop={onDrop}
-            onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            className={`dropzone-interactive flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed p-4 sm:px-6 text-center transition ${
+              isDragging
+                ? "border-cyan-300 bg-cyan-400/[0.12] scale-[1.01]"
+                : "border-cyan-400/30 bg-cyan-400/[0.04] hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
+            }`}
           >
             <input type="file" className="sr-only" accept=".zip" onChange={onChoose} />
-            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
+            <UploadCloud className={`h-8 w-8 sm:h-10 sm:w-10 text-cyan-300 transition-transform duration-200 ${isDragging ? "scale-110 -translate-y-1" : ""}`} />
             <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">Choose a ZIP archive to inspect &amp; extract</h2>
             <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">Drag &amp; drop or click to upload your archive</p>
             <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-400">
@@ -168,7 +182,7 @@ export function ZipExtractorWorkspace() {
             ) : null}
 
             {error && (
-              <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200">
+              <p role="alert" className="animate-error-shake rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200">
                 {error}
               </p>
             )}
@@ -178,7 +192,7 @@ export function ZipExtractorWorkspace() {
               type="button"
               onClick={handleExtract}
               disabled={busy || loadingInspect || entries.length === 0}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-interactive inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy ? (
                 <>
@@ -193,8 +207,8 @@ export function ZipExtractorWorkspace() {
 
             {/* Result */}
             {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
+              <div className="animate-subtle-enter flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
+                <CheckCircle2 className="animate-check-pop h-6 w-6 text-emerald-300 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white">Extracted successfully!</p>
                   <p className="truncate text-xs text-slate-400">
@@ -205,17 +219,19 @@ export function ZipExtractorWorkspace() {
                   <a
                     href={result.url}
                     download={result.name}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
+                    onClick={() => playDownload()}
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 active:scale-[0.98] transition shadow-md shadow-emerald-950/20"
                   >
                     <Download className="h-4 w-4" /> Download
                   </a>
                   <button
                     type="button"
                     onClick={() => {
+                      playClick();
                       if (result?.url) URL.revokeObjectURL(result.url);
                       setResult(null);
                     }}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    className="btn-interactive inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10 active:scale-[0.98] transition"
                   >
                     <RotateCcw className="h-4 w-4" /> Reset
                   </button>

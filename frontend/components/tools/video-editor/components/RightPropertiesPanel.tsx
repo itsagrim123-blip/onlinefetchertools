@@ -593,7 +593,7 @@ export function RightPropertiesPanel({
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedClip.cropPreset || "original"}
-                    onChange={(e) => onUpdateClip({ cropPreset: e.target.value as any })}
+                    onChange={(e) => onUpdateClip({ cropPreset: e.target.value as VideoClip["cropPreset"] })}
                     className="flex-1 h-9 rounded-xl border border-white/10 bg-slate-900 px-3 text-xs text-white focus:outline-none"
                   >
                     <option value="original">Original</option>

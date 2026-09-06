@@ -7,7 +7,7 @@ export default function Home() {
     <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_35%),linear-gradient(180deg,#020817_0%,#0f172a_100%)] text-slate-100">
       <Header />
       <section className="mx-auto max-w-7xl w-full px-4 pb-10 pt-10 text-center sm:px-6 sm:pb-16 sm:pt-20 lg:px-8 lg:pt-28">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-3xl animate-subtle-enter">
           <p className="mb-4 sm:mb-6 inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[11px] sm:text-xs font-medium uppercase tracking-[0.18em] text-cyan-200">
             One calm workspace for your files
           </p>

@@ -14,7 +14,7 @@ import {
   Volume2,
   Camera,
 } from "lucide-react";
-import { ClipPropertyTab, SidebarTab, VideoClip } from "../types";
+import { VideoClip } from "../types";
 
 interface EditorToolbarProps {
   selectedClip?: VideoClip;
@@ -150,12 +150,12 @@ export function EditorToolbar({
               type="button"
               onClick={tool.onClick}
               disabled={tool.disabled}
-              className={`flex flex-col items-center justify-center w-12 h-11 rounded-xl transition ${
+              className={`btn-interactive flex flex-col items-center justify-center w-12 h-11 rounded-xl transition ${
                 tool.disabled
                   ? "text-slate-600 opacity-40 cursor-not-allowed"
                   : tool.danger
-                  ? "text-slate-400 hover:text-red-400 hover:bg-red-400/10"
-                  : "text-slate-400 hover:text-cyan-300 hover:bg-cyan-400/10"
+                  ? "text-slate-400 hover:text-red-400 hover:bg-red-400/10 active:scale-95"
+                  : "text-slate-400 hover:text-cyan-300 hover:bg-cyan-400/10 active:scale-95"
               }`}
               title={tool.label}
             >
@@ -171,10 +171,10 @@ export function EditorToolbar({
             type="button"
             onClick={() => setShowMoreMenu(!showMoreMenu)}
             disabled={!selectedClip}
-            className={`flex flex-col items-center justify-center w-12 h-11 rounded-xl transition ${
+            className={`btn-interactive flex flex-col items-center justify-center w-12 h-11 rounded-xl transition ${
               !selectedClip
                 ? "text-slate-600 opacity-40 cursor-not-allowed"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
+                : "text-slate-400 hover:text-white hover:bg-white/5 active:scale-95"
             }`}
             title="More Options"
           >
