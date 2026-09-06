@@ -51,6 +51,14 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
   const isPhotoEditor = slug === "image-cropper" || slug === "image-rotator";
   const isZipExtractor = slug === "zip-extractor";
 
+  if (isVideoEditor) {
+    return (
+      <main className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full overflow-hidden bg-slate-950 text-slate-100 flex flex-col select-none">
+        <VideoEditorWorkspace />
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.13),_transparent_34%),linear-gradient(180deg,#020817_0%,#0f172a_100%)] text-slate-100">
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-6 sm:pb-20 sm:pt-10 lg:px-8">

@@ -32,7 +32,7 @@ export function MobileBottomNav({
 }: MobileBottomNavProps) {
   if (hasSelectedClip) {
     return (
-      <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-white/10 bg-slate-950/95 px-2 py-2 backdrop-blur-md lg:hidden">
+      <nav className="w-full shrink-0 z-40 flex items-center justify-around border-t border-white/10 bg-slate-950 px-1 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] lg:hidden">
         <button
           type="button"
           onClick={onSplit}
@@ -87,12 +87,12 @@ export function MobileBottomNav({
           <Trash2 className="h-5 w-5" />
           <span className="text-[10px] font-medium">Delete</span>
         </button>
-      </div>
+      </nav>
     );
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-white/10 bg-slate-950/95 px-2 py-2 backdrop-blur-md lg:hidden">
+    <nav className="w-full shrink-0 z-40 flex items-center justify-around border-t border-white/10 bg-slate-950 px-1 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] lg:hidden">
       <button
         type="button"
         onClick={() => onOpenSheet("media")}
@@ -155,7 +155,7 @@ export function MobileBottomNav({
         <Sliders className="h-5 w-5 text-sky-400" />
         <span className="text-[10px] font-medium">Adjust</span>
       </button>
-    </div>
+    </nav>
   );
 }
 

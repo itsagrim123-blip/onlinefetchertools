@@ -185,7 +185,13 @@ export function Timeline({
   );
 
   return (
-    <div className="flex flex-col w-full rounded-2xl border border-white/10 bg-slate-950/80 p-2.5 sm:p-3 text-white shadow-xl select-none">
+    <div
+      className={
+        hideTopToolbar
+          ? "flex flex-col w-full h-full bg-slate-950 text-white select-none overflow-hidden"
+          : "flex flex-col w-full rounded-2xl border border-white/10 bg-slate-950/80 p-2.5 sm:p-3 text-white shadow-xl select-none"
+      }
+    >
       {/* Top Toolbar (optional if parent renders EditorToolbar) */}
       {!hideTopToolbar && (
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2 border-b border-white/10">
@@ -287,7 +293,13 @@ export function Timeline({
       )}
 
       {/* Main Track Workspace: Fixed Left Header Column + Right Scrollable Tracks */}
-      <div className="flex w-full overflow-hidden rounded-xl border border-white/10 bg-slate-950/60">
+      <div
+        className={
+          hideTopToolbar
+            ? "flex w-full h-full overflow-hidden bg-slate-950"
+            : "flex w-full overflow-hidden rounded-xl border border-white/10 bg-slate-950/60"
+        }
+      >
         {/* Left Track Headers (Sticky / Fixed Column) */}
         <div className="w-24 sm:w-32 shrink-0 border-r border-white/10 bg-slate-900/80 flex flex-col select-none">
           {/* Ruler Corner */}

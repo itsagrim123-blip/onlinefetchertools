@@ -315,18 +315,18 @@ export function CanvasPreview({
     return `translate(${offX}%, ${offY}%) scale(${scale}) scale(${flipX}, ${flipY}) rotate(${rot}deg)`;
   }, [activeClipInfo]);
 
-  // Aspect ratio class / styles
+  // Aspect ratio styling (fills available flex height & width preserving ratio)
   const aspectRatioStyle = useMemo(() => {
     switch (project.settings.aspectRatio) {
       case "9:16":
-        return { aspectRatio: "9/16", maxWidth: "270px" };
+        return { aspectRatio: "9/16", maxHeight: "100%", maxWidth: "100%" };
       case "1:1":
-        return { aspectRatio: "1/1", maxWidth: "420px" };
+        return { aspectRatio: "1/1", maxHeight: "100%", maxWidth: "100%" };
       case "4:5":
-        return { aspectRatio: "4/5", maxWidth: "350px" };
+        return { aspectRatio: "4/5", maxHeight: "100%", maxWidth: "100%" };
       case "16:9":
       default:
-        return { aspectRatio: "16/9", maxWidth: "100%" };
+        return { aspectRatio: "16/9", maxHeight: "100%", maxWidth: "100%" };
     }
   }, [project.settings.aspectRatio]);
 
@@ -371,7 +371,7 @@ export function CanvasPreview({
   return (
     <div
       ref={containerRef}
-      className="flex flex-col items-center w-full rounded-2xl border border-white/10 bg-slate-950/80 p-2.5 sm:p-3 text-white shadow-xl"
+      className="relative flex flex-col items-center w-full h-full min-h-0 justify-between text-white select-none overflow-hidden"
     >
       {/* Hidden audio element for background track */}
       <audio ref={bgAudioRef} preload="auto" className="hidden" />
@@ -382,12 +382,12 @@ export function CanvasPreview({
           onSelectOverlay?.(null);
           onSelectText?.(null);
         }}
-        className="relative w-full flex items-center justify-center bg-black/90 rounded-xl overflow-hidden min-h-[240px] sm:min-h-[340px] max-h-[420px] border border-white/5"
+        className="relative w-full flex-1 min-h-0 flex items-center justify-center bg-black/95 rounded-xl overflow-hidden border border-white/10 shadow-inner"
       >
         <div
           ref={stageRef}
           style={aspectRatioStyle}
-          className="relative w-full h-full max-h-[420px] flex items-center justify-center overflow-hidden bg-black select-none"
+          className="relative max-w-full max-h-full flex items-center justify-center overflow-hidden bg-black select-none"
         >
           {/* Active Clip Video or Image */}
           {activeClipInfo && activeAsset ? (
@@ -630,8 +630,8 @@ export function CanvasPreview({
         )}
       </div>
 
-      {/* Scrubber Line directly beneath Video (matching reference image) */}
-      <div className="mt-2.5 flex items-center gap-2.5 w-full px-1">
+      {/* Scrubber Line directly beneath Video */}
+      <div className="mt-1 flex items-center gap-2 w-full px-1 shrink-0 h-7 sm:h-8">
         <button
           type="button"
           onClick={onTogglePlay}
@@ -684,13 +684,13 @@ export function CanvasPreview({
       </div>
 
       {/* Secondary Playback Strip: Skip, Step, Master Volume, Capture Frame */}
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 w-full border-t border-white/5 pt-2 px-1">
+      <div className="mt-0.5 flex flex-wrap items-center justify-between gap-2 w-full border-t border-white/5 pt-1 px-1 shrink-0 h-7 sm:h-8 text-xs">
         {/* Playback step buttons */}
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => onSeek(0)}
-            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition text-xs"
+            className="h-6 w-6 flex items-center justify-center rounded border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition text-xs"
             title="Jump to Start"
           >
             |◀
@@ -698,7 +698,7 @@ export function CanvasPreview({
           <button
             type="button"
             onClick={() => onSeek(Math.max(0, currentTime - 1.0))}
-            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
+            className="h-6 w-6 flex items-center justify-center rounded border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
             title="Seek Back 1s"
           >
             <RotateCcw className="h-3 w-3" />
@@ -706,7 +706,7 @@ export function CanvasPreview({
           <button
             type="button"
             onClick={() => onSeek(Math.min(totalDuration, currentTime + 1.0))}
-            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
+            className="h-6 w-6 flex items-center justify-center rounded border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
             title="Seek Forward 1s"
           >
             <RotateCw className="h-3 w-3" />
@@ -714,7 +714,7 @@ export function CanvasPreview({
           <button
             type="button"
             onClick={() => onSeek(totalDuration)}
-            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition text-xs"
+            className="h-6 w-6 flex items-center justify-center rounded border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition text-xs"
             title="Jump to End"
           >
             ▶|
@@ -726,7 +726,7 @@ export function CanvasPreview({
           <button
             type="button"
             onClick={() => setIsMasterMuted(!isMasterMuted)}
-            className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition"
+            className="h-6 w-6 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-white/5 transition"
             title={isMasterMuted ? "Unmute All" : "Mute All"}
           >
             {isMasterMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-cyan-300" />}
@@ -773,7 +773,7 @@ export function CanvasPreview({
             type="button"
             onClick={handleCaptureFrame}
             disabled={!activeClipInfo || activeClipInfo.clip.type !== "video"}
-            className="inline-flex h-7 items-center gap-1 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-400/20 transition disabled:opacity-30 disabled:cursor-not-allowed"
+            className="inline-flex h-6 sm:h-7 items-center gap-1 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-400/20 transition disabled:opacity-30 disabled:cursor-not-allowed"
             title="Capture Video Frame"
           >
             <Camera className="h-3 w-3" />
@@ -782,35 +782,35 @@ export function CanvasPreview({
         </div>
       </div>
 
-      {/* Captured Frame Card Notification */}
+      {/* Floating Captured Frame Notification Toast */}
       {capturedFrame && (
-        <div className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full rounded-xl border border-cyan-400/30 bg-cyan-950/40 p-3">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="absolute bottom-16 left-4 right-4 z-40 max-w-md mx-auto flex items-center justify-between gap-3 rounded-xl border border-cyan-400/40 bg-slate-950/95 p-2.5 shadow-2xl backdrop-blur-md">
+          <div className="flex items-center gap-2.5 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={capturedFrame.url}
               alt="Captured Frame"
-              className="h-12 w-20 rounded-lg object-cover border border-white/10 shrink-0"
+              className="h-10 w-16 rounded-lg object-cover border border-white/10 shrink-0"
             />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-white">Frame Captured Successfully!</p>
-              <p className="truncate text-[11px] text-slate-400 font-mono">{capturedFrame.name}</p>
+              <p className="text-xs font-semibold text-white">Frame Captured!</p>
+              <p className="truncate text-[10px] text-slate-400 font-mono">{capturedFrame.name}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <a
               href={capturedFrame.url}
               download={capturedFrame.name}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 text-xs font-semibold text-slate-950 hover:bg-emerald-300 transition"
+              className="inline-flex h-7 items-center gap-1 rounded-lg bg-emerald-400 px-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-300 transition"
             >
-              <Download className="h-3.5 w-3.5" /> Download Frame
+              <Download className="h-3 w-3" /> Download
             </a>
             <button
               type="button"
               onClick={() => setCapturedFrame(null)}
-              className="inline-flex h-8 px-2.5 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10"
+              className="inline-flex h-7 px-2 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10"
             >
-              Dismiss
+              ✕
             </button>
           </div>
         </div>

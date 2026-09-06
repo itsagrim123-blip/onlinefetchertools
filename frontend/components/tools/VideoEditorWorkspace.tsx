@@ -372,7 +372,7 @@ export function VideoEditorWorkspace() {
   };
 
   return (
-    <div className="w-full flex flex-col bg-slate-950 text-white min-h-[calc(100vh-4rem)] select-none">
+    <div className="w-full h-full flex flex-col bg-slate-950 text-white select-none overflow-hidden">
       {/* Top Header Bar */}
       <EditorTopBar
         projectTitle={project.title}
@@ -388,8 +388,9 @@ export function VideoEditorWorkspace() {
       {/* ========================================================================= */}
       {/* DESKTOP LAYOUT (4-column Studio Workspace: Sidebar + Drawer + Center + Right) */}
       {/* ========================================================================= */}
-      <div className="hidden lg:flex flex-col flex-1 min-h-0">
-        <div className="flex flex-1 min-h-[480px] overflow-hidden border-b border-white/10">
+      <div className="hidden lg:flex flex-col flex-1 min-h-0 w-full overflow-hidden">
+        {/* Upper Studio: Sidebar, Drawer, Dominant Preview Player, Properties Panel */}
+        <div className="flex flex-1 min-h-0 w-full overflow-hidden border-b border-white/10">
           {/* Col 1: Vertical Sidebar (80px) */}
           <EditorSidebar
             activeTab={sidebarTab}
@@ -418,65 +419,28 @@ export function VideoEditorWorkspace() {
             onUpdateTitle={(title) => setProjectTitle(title)}
           />
 
-          {/* Col 3: Center Stage: Preview Canvas + Toolbar (Flexible width) */}
-          <div className="flex-1 flex flex-col min-w-0 bg-slate-900/30 p-3 overflow-y-auto">
-            {/* Player Canvas */}
-            <div className="w-full flex-1 flex items-center justify-center">
-              <CanvasPreview
-                project={project}
-                currentTime={currentTime}
-                totalDuration={totalDuration}
-                isPlaying={isPlaying}
-                onTimeUpdate={setCurrentTime}
-                onTogglePlay={togglePlay}
-                onSeek={seekTo}
-                onUpdateSettings={(settings) => {
-                  if (settings.aspectRatio) setAspectRatio(settings.aspectRatio);
-                }}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-                selectedOverlayId={selectedOverlayId}
-                onSelectOverlay={(id) => selectOverlay(id)}
-                onUpdateOverlay={(id, partial) => updateOverlayLayer(id, partial)}
-                onDeleteOverlay={(id) => removeOverlayLayer(id)}
-                selectedTextId={selectedTextId}
-                onSelectText={(id) => selectText(id)}
-                onUpdateText={(id, partial) => updateTextLayer(id, partial)}
-              />
-            </div>
-
-            {/* Horizontal Tool Bar between Preview and Timeline */}
-            <div className="mt-3 w-full">
-              <EditorToolbar
-                selectedClip={selectedClip}
-                hasSelectedClip={Boolean(selectedClipId)}
-                hasSelectedItem={hasSelectedItem}
-                canSplit={canSplit}
-                onSplit={() => splitClipAtTime(currentTime)}
-                onDelete={handleDeleteSelected}
-                onDuplicate={handleDuplicateSelected}
-                onTrim={() => {
-                  setClipTab("video");
-                }}
-                onCrop={() => {
-                  setClipTab("video");
-                }}
-                onSpeed={() => {
-                  setClipTab("speed");
-                }}
-                onVolume={() => {
-                  setClipTab("audio");
-                }}
-                onFilters={() => {
-                  setClipTab("adjust");
-                  setSidebarTab("filters");
-                }}
-                onAdjust={() => {
-                  setClipTab("adjust");
-                }}
-                onReverse={handleReverseSelected}
-                onFreezeFrame={handleFreezeFrameSelected}
-              />
-            </div>
+          {/* Col 3: Center Stage: Dominant Preview Canvas (Flexible width & height) */}
+          <div className="flex-1 flex flex-col min-w-0 h-full bg-slate-950/60 p-2 sm:p-3 overflow-hidden">
+            <CanvasPreview
+              project={project}
+              currentTime={currentTime}
+              totalDuration={totalDuration}
+              isPlaying={isPlaying}
+              onTimeUpdate={setCurrentTime}
+              onTogglePlay={togglePlay}
+              onSeek={seekTo}
+              onUpdateSettings={(settings) => {
+                if (settings.aspectRatio) setAspectRatio(settings.aspectRatio);
+              }}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              selectedOverlayId={selectedOverlayId}
+              onSelectOverlay={(id) => selectOverlay(id)}
+              onUpdateOverlay={(id, partial) => updateOverlayLayer(id, partial)}
+              onDeleteOverlay={(id) => removeOverlayLayer(id)}
+              selectedTextId={selectedTextId}
+              onSelectText={(id) => selectText(id)}
+              onUpdateText={(id, partial) => updateTextLayer(id, partial)}
+            />
           </div>
 
           {/* Col 4: Right Properties Inspector (320px) */}
@@ -516,8 +480,32 @@ export function VideoEditorWorkspace() {
           />
         </div>
 
-        {/* Desktop Bottom Area: Full Timeline + Status Bar */}
-        <div className="flex flex-col bg-slate-950 p-2.5 space-y-2">
+        {/* Row 2: Full-width Mid Editing Toolbar spanning directly above the timeline */}
+        <div className="w-full shrink-0 border-b border-white/10 bg-slate-950">
+          <EditorToolbar
+            selectedClip={selectedClip}
+            hasSelectedClip={Boolean(selectedClipId)}
+            hasSelectedItem={hasSelectedItem}
+            canSplit={canSplit}
+            onSplit={() => splitClipAtTime(currentTime)}
+            onDelete={handleDeleteSelected}
+            onDuplicate={handleDuplicateSelected}
+            onTrim={() => setClipTab("video")}
+            onCrop={() => setClipTab("video")}
+            onSpeed={() => setClipTab("speed")}
+            onVolume={() => setClipTab("audio")}
+            onFilters={() => {
+              setClipTab("adjust");
+              setSidebarTab("filters");
+            }}
+            onAdjust={() => setClipTab("adjust")}
+            onReverse={handleReverseSelected}
+            onFreezeFrame={handleFreezeFrameSelected}
+          />
+        </div>
+
+        {/* Row 3: Full-width Docked Timeline */}
+        <div className="w-full h-[224px] shrink-0 overflow-hidden bg-slate-950">
           <Timeline
             project={project}
             currentTime={currentTime}
@@ -547,7 +535,10 @@ export function VideoEditorWorkspace() {
             onAddMediaClick={() => setSidebarTab("media")}
             hideTopToolbar={true}
           />
+        </div>
 
+        {/* Row 4: Status Bar */}
+        <div className="w-full shrink-0">
           <EditorStatusBar
             project={project}
             totalDuration={totalDuration}
@@ -565,9 +556,9 @@ export function VideoEditorWorkspace() {
       {/* ========================================================================= */}
       {/* MOBILE PORTRAIT LAYOUT (320px - 430px Responsive Stacked Experience) */}
       {/* ========================================================================= */}
-      <div className="flex lg:hidden flex-col flex-1 min-h-0 pb-20 overflow-x-hidden">
-        {/* Preview Player */}
-        <div className="p-2 w-full">
+      <div className="flex lg:hidden flex-col flex-1 min-h-0 w-full overflow-hidden bg-slate-950">
+        {/* Preview Player Stage */}
+        <div className="flex-1 min-h-0 w-full p-2 overflow-hidden flex flex-col items-center justify-center">
           <CanvasPreview
             project={project}
             currentTime={currentTime}
@@ -590,7 +581,7 @@ export function VideoEditorWorkspace() {
         </div>
 
         {/* Compact Mid Editing Toolbar */}
-        <div className="px-2 pb-2">
+        <div className="w-full shrink-0 border-t border-white/10 bg-slate-950">
           <EditorToolbar
             selectedClip={selectedClip}
             hasSelectedClip={Boolean(selectedClipId)}
@@ -611,7 +602,7 @@ export function VideoEditorWorkspace() {
         </div>
 
         {/* Contained Timeline with touch scrubbing */}
-        <div className="px-2 flex-1 min-h-[220px]">
+        <div className="w-full h-[150px] shrink-0 border-t border-white/10 bg-slate-950 overflow-hidden">
           <Timeline
             project={project}
             currentTime={currentTime}
@@ -639,7 +630,7 @@ export function VideoEditorWorkspace() {
             onToggleTrackVisibility={(track) => toggleTrackVisibility(track)}
             onToggleTrackLock={(track) => toggleTrackLock(track)}
             onAddMediaClick={() => handleOpenMobileSheet("media")}
-            hideTopToolbar={false}
+            hideTopToolbar={true}
           />
         </div>
 
