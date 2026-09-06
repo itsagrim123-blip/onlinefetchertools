@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   AlignCenter,
   AlignLeft,
@@ -67,7 +68,7 @@ const ANIMATIONS: { id: TextAnimationType; label: string }[] = [
   { id: "scale_up", label: "Pop" },
 ];
 
-export function RightPropertiesPanel({
+export const RightPropertiesPanel = memo(function RightPropertiesPanel({
   project,
   selectedClip,
   selectedAudio,
@@ -860,4 +861,4 @@ export function RightPropertiesPanel({
       </p>
     </div>
   );
-}
+});

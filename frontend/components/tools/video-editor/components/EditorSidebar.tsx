@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Film,
   Music,
@@ -30,7 +31,7 @@ const SIDEBAR_ITEMS: { id: SidebarTab; label: string; icon: React.ComponentType<
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function EditorSidebar({ activeTab, onSelectTab }: EditorSidebarProps) {
+export const EditorSidebar = memo(function EditorSidebar({ activeTab, onSelectTab }: EditorSidebarProps) {
   return (
     <aside className="w-20 shrink-0 bg-slate-950/90 border-r border-white/10 flex flex-col items-center py-3 gap-2 select-none">
       {SIDEBAR_ITEMS.map((item) => {
@@ -54,5 +55,5 @@ export function EditorSidebar({ activeTab, onSelectTab }: EditorSidebarProps) {
       })}
     </aside>
   );
-}
+});
 

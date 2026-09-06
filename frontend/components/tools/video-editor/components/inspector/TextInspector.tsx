@@ -1,5 +1,4 @@
-"use client";
-
+import { memo } from "react";
 import {
   AlignCenter,
   AlignLeft,
@@ -34,7 +33,7 @@ const ANIMATION_OPTIONS: { id: TextAnimationType; label: string }[] = [
   { id: "scale_up", label: "Pop / Scale" },
 ];
 
-export function TextInspector({
+export const TextInspector = memo(function TextInspector({
   layer,
   onUpdateLayer,
   onRemoveLayer,
@@ -230,5 +229,5 @@ export function TextInspector({
       </div>
     </div>
   );
-}
+});
 

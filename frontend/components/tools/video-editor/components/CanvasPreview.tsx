@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   Download,
@@ -46,7 +46,7 @@ interface CanvasPreviewProps {
   onUpdateText?: (id: string, partial: Partial<TextLayerItem>) => void;
 }
 
-export function CanvasPreview({
+export const CanvasPreview = memo(function CanvasPreview({
   project,
   currentTime,
   totalDuration,
@@ -78,10 +78,11 @@ export function CanvasPreview({
   const clipRanges = useMemo(() => computeClipTimeRanges(project.clips), [project.clips]);
   const activeClipInfo = useMemo(() => findClipAtTime(clipRanges, currentTime), [clipRanges, currentTime]);
 
+  const activeAssetId = activeClipInfo?.clip.assetId;
   const activeAsset: MediaAsset | undefined = useMemo(() => {
-    if (!activeClipInfo) return undefined;
-    return project.assets.find((a) => a.id === activeClipInfo.clip.assetId);
-  }, [activeClipInfo, project.assets]);
+    if (!activeAssetId) return undefined;
+    return project.assets.find((a) => a.id === activeAssetId);
+  }, [activeAssetId, project.assets]);
 
   // Determine active background audio
   const activeAudioTrack = useMemo(() => {
@@ -90,12 +91,14 @@ export function CanvasPreview({
     );
   }, [project.audioTracks, currentTime]);
 
+  const activeAudioAssetId = activeAudioTrack?.assetId;
   const activeAudioAsset = useMemo(() => {
-    if (!activeAudioTrack) return undefined;
-    return project.assets.find((a) => a.id === activeAudioTrack.assetId);
-  }, [activeAudioTrack, project.assets]);
+    if (!activeAudioAssetId) return undefined;
+    return project.assets.find((a) => a.id === activeAudioAssetId);
+  }, [activeAudioAssetId, project.assets]);
 
   const currentVideoSrcRef = useRef<string | null>(null);
+  const currentClipIdRef = useRef<string | null>(null);
   const isPlayingRef = useRef<boolean>(isPlaying);
 
   useEffect(() => {
@@ -109,20 +112,27 @@ export function CanvasPreview({
       return;
     }
 
-    if (currentVideoSrcRef.current !== activeAsset.objectUrl) {
+    const isDifferentSrc = currentVideoSrcRef.current !== activeAsset.objectUrl;
+    const isDifferentClip = currentClipIdRef.current !== activeClipInfo.clip.id;
+
+    if (isDifferentSrc) {
       currentVideoSrcRef.current = activeAsset.objectUrl;
       video.src = activeAsset.objectUrl;
       video.currentTime = activeClipInfo.localSourceTime;
       if (isPlayingRef.current) {
         video.play().catch(() => {});
       }
+    } else if (isDifferentClip) {
+      video.currentTime = activeClipInfo.localSourceTime;
     }
 
+    currentClipIdRef.current = activeClipInfo.clip.id;
     video.playbackRate = Math.max(0.25, Math.min(4.0, activeClipInfo.clip.speed || 1.0));
     const clipVol = activeClipInfo.clip.isMuted ? 0 : activeClipInfo.clip.volume;
     video.volume = isMasterMuted ? 0 : Math.min(1, clipVol * masterVolume);
   }, [
     activeClipInfo?.clip.id,
+    activeClipInfo?.localSourceTime,
     activeAsset?.objectUrl,
     activeClipInfo?.clip.speed,
     activeClipInfo?.clip.volume,
@@ -175,23 +185,42 @@ export function CanvasPreview({
     }
   }, [currentTime, isPlaying, activeClipInfo, activeAudioTrack, activeAudioAsset, isMasterMuted, masterVolume]);
 
+  // Playback refs for uninterrupted, non-tearing 60fps RAF loop
+  const currentTimeRef = useRef<number>(currentTime);
+  currentTimeRef.current = currentTime;
+  const activeClipInfoRef = useRef(activeClipInfo);
+  activeClipInfoRef.current = activeClipInfo;
+  const activeAssetRef = useRef(activeAsset);
+  activeAssetRef.current = activeAsset;
+  const totalDurationRef = useRef<number>(totalDuration);
+  totalDurationRef.current = totalDuration;
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onTimeUpdateRef.current = onTimeUpdate;
+  const onTogglePlayRef = useRef(onTogglePlay);
+  onTogglePlayRef.current = onTogglePlay;
+  const onSeekRef = useRef(onSeek);
+  onSeekRef.current = onSeek;
+
   // 4. Smooth Hardware-Accelerated Playback Loop (Video element drives time)
   useEffect(() => {
     if (!isPlaying) return;
 
     let animId: number;
     let lastWallTime = performance.now();
-    let lastThrottledTime = performance.now();
+    let lastThrottledTime = 0;
 
     const tick = (now: number) => {
       const video = videoRef.current;
+      const curClipInfo = activeClipInfoRef.current;
+      const curAsset = activeAssetRef.current;
+      const maxDuration = totalDurationRef.current;
 
-      if (activeClipInfo && activeAsset && activeClipInfo.clip.type === "video" && video) {
-        const speed = Math.max(0.25, Math.min(4.0, activeClipInfo.clip.speed || 1.0));
-        const clip = activeClipInfo.clip;
+      if (curClipInfo && curAsset && curClipInfo.clip.type === "video" && video) {
+        const speed = Math.max(0.25, Math.min(4.0, curClipInfo.clip.speed || 1.0));
+        const clip = curClipInfo.clip;
         const currentSourceTime = video.currentTime;
-        const startTime = activeClipInfo.startTime;
-        const endTime = activeClipInfo.endTime;
+        const startTime = curClipInfo.startTime;
+        const endTime = curClipInfo.endTime;
         const isReversed = Boolean(clip.isReversed);
 
         let elapsedInClip: number;
@@ -209,13 +238,13 @@ export function CanvasPreview({
 
         // Clip boundary completion check
         if (isClipEnded || currentProjectTime >= endTime - 0.03) {
-          if (endTime >= totalDuration - 0.05) {
-            onTimeUpdate(totalDuration);
-            onTogglePlay();
+          if (endTime >= maxDuration - 0.05) {
+            onTimeUpdateRef.current(maxDuration);
+            onTogglePlayRef.current();
             return;
           } else {
             // Smoothly jump to next clip
-            onSeek(endTime + 0.02);
+            onSeekRef.current(endTime + 0.02);
             return;
           }
         }
@@ -224,20 +253,24 @@ export function CanvasPreview({
         // prevents React from starving the main thread with 60 re-renders/sec
         if (now - lastThrottledTime >= 33) {
           lastThrottledTime = now;
-          onTimeUpdate(currentProjectTime);
+          onTimeUpdateRef.current(currentProjectTime);
         }
       } else {
         // Image clip or gap: advance using delta time
         const delta = (now - lastWallTime) / 1000;
         lastWallTime = now;
-        const nextTime = currentTime + delta;
+        const nextTime = currentTimeRef.current + delta;
 
-        if (nextTime >= totalDuration) {
-          onTimeUpdate(totalDuration);
-          onTogglePlay();
+        if (nextTime >= maxDuration) {
+          onTimeUpdateRef.current(maxDuration);
+          onTogglePlayRef.current();
           return;
         } else {
-          onTimeUpdate(nextTime);
+          currentTimeRef.current = nextTime;
+          if (now - lastThrottledTime >= 33) {
+            lastThrottledTime = now;
+            onTimeUpdateRef.current(nextTime);
+          }
         }
       }
 
@@ -246,25 +279,17 @@ export function CanvasPreview({
 
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, [
-    isPlaying,
-    activeClipInfo,
-    activeAsset,
-    currentTime,
-    totalDuration,
-    onTimeUpdate,
-    onTogglePlay,
-    onSeek,
-  ]);
+  }, [isPlaying]);
 
-  // CSS Filter string calculation
+  const activeClip = activeClipInfo?.clip;
+
+  // CSS Filter string calculation - cached and only recalculated when visual filter settings change
   const filterStyle = useMemo(() => {
-    if (!activeClipInfo) return "none";
-    const clip = activeClipInfo.clip;
+    if (!activeClip) return "none";
     const parts: string[] = [];
 
     // Presets
-    switch (clip.filterPreset) {
+    switch (activeClip.filterPreset) {
       case "warm":
         parts.push("sepia(0.3) saturate(1.2) hue-rotate(-10deg)");
         break;
@@ -291,32 +316,45 @@ export function CanvasPreview({
     }
 
     // Adjustments
-    if (clip.brightness !== 0) {
-      parts.push(`brightness(${1 + clip.brightness / 100})`);
+    if (activeClip.brightness !== 0) {
+      parts.push(`brightness(${1 + activeClip.brightness / 100})`);
     }
-    if (clip.contrast !== 0) {
-      parts.push(`contrast(${1 + clip.contrast / 100})`);
+    if (activeClip.contrast !== 0) {
+      parts.push(`contrast(${1 + activeClip.contrast / 100})`);
     }
-    if (clip.saturation !== 0) {
-      parts.push(`saturate(${1 + clip.saturation / 100})`);
+    if (activeClip.saturation !== 0) {
+      parts.push(`saturate(${1 + activeClip.saturation / 100})`);
     }
 
     return parts.length > 0 ? parts.join(" ") : "none";
-  }, [activeClipInfo]);
+  }, [
+    activeClip?.filterPreset,
+    activeClip?.brightness,
+    activeClip?.contrast,
+    activeClip?.saturation,
+    activeClip?.id,
+  ]);
 
-  // CSS Transform string calculation
+  // CSS Transform string calculation - cached and only recalculated when transform values change
   const transformStyle = useMemo(() => {
-    if (!activeClipInfo) return "none";
-    const clip = activeClipInfo.clip;
-    const scale = clip.scale || 1.0;
-    const rot = clip.rotation || 0;
-    const flipX = clip.flipHorizontal ? -1 : 1;
-    const flipY = clip.flipVertical ? -1 : 1;
-    const offX = clip.offsetX || 0;
-    const offY = clip.offsetY || 0;
+    if (!activeClip) return "none";
+    const scale = activeClip.scale || 1.0;
+    const rot = activeClip.rotation || 0;
+    const flipX = activeClip.flipHorizontal ? -1 : 1;
+    const flipY = activeClip.flipVertical ? -1 : 1;
+    const offX = activeClip.offsetX || 0;
+    const offY = activeClip.offsetY || 0;
 
     return `translate(${offX}%, ${offY}%) scale(${scale}) scale(${flipX}, ${flipY}) rotate(${rot}deg)`;
-  }, [activeClipInfo]);
+  }, [
+    activeClip?.scale,
+    activeClip?.rotation,
+    activeClip?.flipHorizontal,
+    activeClip?.flipVertical,
+    activeClip?.offsetX,
+    activeClip?.offsetY,
+    activeClip?.id,
+  ]);
 
   // Aspect ratio styling (fills available flex height & width preserving ratio)
   const aspectRatioStyle = useMemo(() => {
@@ -403,6 +441,8 @@ export function CanvasPreview({
                   filter: filterStyle,
                   transform: transformStyle,
                   opacity: activeClipInfo.clip.opacity ?? 1.0,
+                  willChange: "transform, filter",
+                  transformOrigin: "center center",
                 }}
                 className="w-full h-full object-contain pointer-events-none"
               />
@@ -415,6 +455,8 @@ export function CanvasPreview({
                   filter: filterStyle,
                   transform: transformStyle,
                   opacity: activeClipInfo.clip.opacity ?? 1.0,
+                  willChange: "transform, filter",
+                  transformOrigin: "center center",
                 }}
                 className="w-full h-full object-contain pointer-events-none"
               />
@@ -820,5 +862,5 @@ export function CanvasPreview({
       )}
     </div>
   );
-}
+});
 

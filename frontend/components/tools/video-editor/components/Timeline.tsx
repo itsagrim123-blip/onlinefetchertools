@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
   Eye,
@@ -61,7 +61,70 @@ interface TimelineProps {
   hideTopToolbar?: boolean;
 }
 
-export function Timeline({
+interface TimelineAudioTrackItemProps {
+  audio: AudioTrackItem;
+  zoom: number;
+  isSelected: boolean;
+  isAudioLocked: boolean;
+  onSelect: () => void;
+}
+
+const TimelineAudioTrackItem = memo(function TimelineAudioTrackItem({
+  audio,
+  zoom,
+  isSelected,
+  isAudioLocked,
+  onSelect,
+}: TimelineAudioTrackItemProps) {
+  const leftPx = audio.timelineStart * zoom;
+  const widthPx = Math.max(40, audio.duration * zoom);
+  const barCount = Math.max(6, Math.floor(widthPx / 5));
+
+  // Memoize waveform bars so array and JSX are only computed when width changes
+  const waveformBars = useMemo(() => {
+    return Array.from({ length: barCount }, (_, bIdx) => {
+      const h = 20 + ((bIdx * 17) % 65);
+      return (
+        <div
+          key={bIdx}
+          style={{ height: `${h}%` }}
+          className="w-0.5 bg-purple-300 rounded-full"
+        />
+      );
+    });
+  }, [barCount]);
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isAudioLocked) onSelect();
+      }}
+      style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
+      className={`absolute h-8 cursor-pointer rounded-lg border px-2 text-[11px] font-medium truncate flex items-center justify-between transition overflow-hidden ${
+        isSelected
+          ? "border-purple-400 bg-purple-500/30 text-white ring-1 ring-purple-400"
+          : "border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20"
+      } ${isAudioLocked ? "cursor-not-allowed opacity-60" : ""}`}
+      title={audio.name}
+    >
+      {/* Simulated Waveform background */}
+      <div className="absolute inset-0 flex items-center justify-around px-1 opacity-20 pointer-events-none">
+        {waveformBars}
+      </div>
+
+      <div className="relative z-10 flex items-center min-w-0 truncate">
+        <Volume2 className="h-3 w-3 mr-1 shrink-0 text-purple-300" />
+        <span className="truncate">{audio.name}</span>
+      </div>
+      <span className="relative z-10 text-[10px] font-mono text-purple-300 ml-1 shrink-0">
+        {Math.round(audio.volume * 100)}%
+      </span>
+    </div>
+  );
+});
+
+export const Timeline = memo(function Timeline({
   project,
   currentTime,
   totalDuration,
@@ -171,14 +234,16 @@ export function Timeline({
     onZoomChange(Math.round(calculatedZoom));
   };
 
+  // Memoize clip ranges from project.clips so computeClipTimeRanges isn't rerun on every frame
+  const clipRanges = useMemo(() => computeClipTimeRanges(project.clips), [project.clips]);
+
   // Check if split is active at current playhead
   const canSplit = useMemo(() => {
-    if (project.clips.length === 0) return false;
-    const ranges = computeClipTimeRanges(project.clips);
-    return ranges.some(
+    if (clipRanges.length === 0) return false;
+    return clipRanges.some(
       (r) => currentTime > r.startTime + 0.15 && currentTime < r.endTime - 0.15
     );
-  }, [project.clips, currentTime]);
+  }, [clipRanges, currentTime]);
 
   const hasSelection = Boolean(
     selectedClipId || selectedAudioId || selectedTextId || selectedOverlayId
@@ -468,8 +533,11 @@ export function Timeline({
 
             {/* Draggable Playhead Needle */}
             <div
-              style={{ left: `${currentTime * zoom}px` }}
-              className="absolute top-0 bottom-0 z-30 pointer-events-none flex flex-col items-center"
+              style={{
+                transform: `translate3d(${currentTime * zoom}px, 0, 0)`,
+                willChange: "transform",
+              }}
+              className="absolute top-0 bottom-0 left-0 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center"
             >
               {/* Playhead Head */}
               <div className="h-4 w-3 -translate-y-0.5 bg-cyan-400 rounded-b shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
@@ -603,56 +671,21 @@ export function Timeline({
                 !isAudioVisible ? "opacity-30" : ""
               }`}
             >
-              {project.audioTracks.map((audio) => {
-                const leftPx = audio.timelineStart * zoom;
-                const widthPx = Math.max(40, audio.duration * zoom);
-                const isSelected = selectedAudioId === audio.id;
-                const barCount = Math.max(6, Math.floor(widthPx / 5));
-
-                return (
-                  <div
-                    key={audio.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isAudioLocked) onSelectAudio(audio.id);
-                    }}
-                    style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
-                    className={`absolute h-8 cursor-pointer rounded-lg border px-2 text-[11px] font-medium truncate flex items-center justify-between transition overflow-hidden ${
-                      isSelected
-                        ? "border-purple-400 bg-purple-500/30 text-white ring-1 ring-purple-400"
-                        : "border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20"
-                    } ${isAudioLocked ? "cursor-not-allowed opacity-60" : ""}`}
-                    title={audio.name}
-                  >
-                    {/* Simulated Waveform background */}
-                    <div className="absolute inset-0 flex items-center justify-around px-1 opacity-20 pointer-events-none">
-                      {Array.from({ length: barCount }).map((_, bIdx) => {
-                        const h = 20 + ((bIdx * 17) % 65);
-                        return (
-                          <div
-                            key={bIdx}
-                            style={{ height: `${h}%` }}
-                            className="w-0.5 bg-purple-300 rounded-full"
-                          />
-                        );
-                      })}
-                    </div>
-
-                    <div className="relative z-10 flex items-center min-w-0 truncate">
-                      <Volume2 className="h-3 w-3 mr-1 shrink-0 text-purple-300" />
-                      <span className="truncate">{audio.name}</span>
-                    </div>
-                    <span className="relative z-10 text-[10px] font-mono text-purple-300 ml-1 shrink-0">
-                      {Math.round(audio.volume * 100)}%
-                    </span>
-                  </div>
-                );
-              })}
+              {project.audioTracks.map((audio) => (
+                <TimelineAudioTrackItem
+                  key={audio.id}
+                  audio={audio}
+                  zoom={zoom}
+                  isSelected={selectedAudioId === audio.id}
+                  isAudioLocked={isAudioLocked}
+                  onSelect={() => onSelectAudio(audio.id)}
+                />
+              ))}
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
+});
 

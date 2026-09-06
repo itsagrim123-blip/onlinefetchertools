@@ -1,5 +1,4 @@
-"use client";
-
+import { memo } from "react";
 import {
   FastForward,
   FlipHorizontal,
@@ -21,7 +20,7 @@ interface ClipInspectorProps {
 
 const SPEED_PRESETS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 4.0];
 
-export function ClipInspector({ clip, onUpdateClip }: ClipInspectorProps) {
+export const ClipInspector = memo(function ClipInspector({ clip, onUpdateClip }: ClipInspectorProps) {
   const rotateClockwise = () => {
     const current = clip.rotation || 0;
     const next = (current + 90) % 360;
@@ -235,4 +234,4 @@ export function ClipInspector({ clip, onUpdateClip }: ClipInspectorProps) {
       </div>
     </div>
   );
-}
+});

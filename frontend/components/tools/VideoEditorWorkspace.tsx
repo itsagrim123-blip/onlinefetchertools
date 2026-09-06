@@ -23,10 +23,25 @@ import {
   MediaType,
   MobileSheetType,
   SidebarTab,
+  TransitionType,
 } from "./video-editor/types";
-import { extractFilmstripFrames } from "./video-editor/utils/mediaUtils";
 import { normalizeBlob, parseFilename, resolveMimeType } from "@/lib/download";
 import { Keyboard, X } from "lucide-react";
+
+function useIsDesktop(breakpoint = 1024) {
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`);
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [breakpoint]);
+
+  return isDesktop;
+}
 
 export function VideoEditorWorkspace() {
   const {
@@ -82,6 +97,7 @@ export function VideoEditorWorkspace() {
     setProjectTitle,
   } = useProjectState();
 
+  const isDesktop = useIsDesktop(1024);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [transitionClipId, setTransitionClipId] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
@@ -111,33 +127,10 @@ export function VideoEditorWorkspace() {
     return clipRanges.some(
       (r) => currentTime > r.startTime + 0.15 && currentTime < r.endTime - 0.15
     );
-  }, [project.clips, clipRanges, currentTime]);
+  }, [project.clips.length, clipRanges, currentTime]);
 
   const hasSelectedItem = Boolean(
     selectedClipId || selectedAudioId || selectedTextId || selectedOverlayId
-  );
-
-  // Wrapped add asset that extracts filmstrip frames for videos
-  const handleAddAssetWithFilmstrip = useCallback(
-    async (
-      file: File,
-      type: MediaType,
-      duration: number = 3.0,
-      width?: number,
-      height?: number,
-      thumbnailUrl?: string
-    ) => {
-      let filmstripFrames: string[] | undefined;
-      if (type === "video") {
-        try {
-          filmstripFrames = await extractFilmstripFrames(file, 6);
-        } catch {
-          // ignore error if cannot extract
-        }
-      }
-      return addAsset(file, type, duration, width, height, thumbnailUrl, filmstripFrames);
-    },
-    [addAsset]
   );
 
   // Operations
@@ -160,9 +153,9 @@ export function VideoEditorWorkspace() {
 
   const handleFreezeFrameSelected = useCallback(() => {
     if (selectedClipId) {
-      insertFreezeFrame(selectedClipId, currentTime, undefined, 2.0);
+      insertFreezeFrame(selectedClipId, undefined, undefined, 2.0);
     }
-  }, [selectedClipId, currentTime, insertFreezeFrame]);
+  }, [selectedClipId, insertFreezeFrame]);
 
   // Keyboard Shortcuts (Undo, Redo, Play/Pause, Delete)
   useEffect(() => {
@@ -358,18 +351,143 @@ export function VideoEditorWorkspace() {
     };
   };
 
-  // Transition Modal Helpers
-  const transitionClip = project.clips.find((c) => c.id === transitionClipId);
-  const handleApplyTransition = (trans: ClipTransition | undefined) => {
-    if (transitionClipId) {
-      updateClip(transitionClipId, { transition: trans });
-    }
-  };
+  // Stable Modal and Dialog Toggles
+  const handleOpenExportModal = useCallback(() => setIsExportModalOpen(true), []);
+  const handleCloseExportModal = useCallback(() => setIsExportModalOpen(false), []);
+  const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
+  const handleCloseSettings = useCallback(() => setIsSettingsOpen(false), []);
+  const handleOpenHelp = useCallback(() => setIsHelpOpen(true), []);
+  const handleCloseHelp = useCallback(() => setIsHelpOpen(false), []);
 
-  // Mobile sheet open handler
-  const handleOpenMobileSheet = (sheet: MobileSheetType) => {
+  const handleAspectRatioChange = useCallback(
+    (ratio: AspectRatioPreset) => {
+      setAspectRatio(ratio);
+    },
+    [setAspectRatio]
+  );
+
+  const handleUpdateSettings = useCallback(
+    (settings: { aspectRatio?: AspectRatioPreset }) => {
+      if (settings.aspectRatio) setAspectRatio(settings.aspectRatio);
+    },
+    [setAspectRatio]
+  );
+
+  // Tool Drawer Actions
+  const handleAddClipFromAsset = useCallback(
+    (assetId: string) => addClipFromAsset(assetId),
+    [addClipFromAsset]
+  );
+  const handleAddAudioAtCurrent = useCallback(
+    (assetId: string) => addAudioTrack(assetId),
+    [addAudioTrack]
+  );
+  const handleAddOverlayAtCurrent = useCallback(
+    (assetId: string) => addOverlayLayer(assetId),
+    [addOverlayLayer]
+  );
+  const handleAddTextAtCurrent = useCallback(
+    (time?: number, text?: string) => addTextLayer(time, text || "Sample Title"),
+    [addTextLayer]
+  );
+  const handleApplyFilterPreset = useCallback(
+    (filter: string) => {
+      if (selectedClipId) updateClip(selectedClipId, { filterPreset: filter as FilterPreset });
+    },
+    [selectedClipId, updateClip]
+  );
+  const handleApplyDrawerTransition = useCallback(
+    (trans: TransitionType) => {
+      if (selectedClipId) updateClip(selectedClipId, { transition: { type: trans, duration: 0.5 } });
+    },
+    [selectedClipId, updateClip]
+  );
+
+  // Inspector Partial Handlers
+  const handleUpdateClipPartial = useCallback(
+    (partial: Parameters<typeof updateClip>[1]) => {
+      if (selectedClipId) updateClip(selectedClipId, partial);
+    },
+    [selectedClipId, updateClip]
+  );
+  const handleUpdateAudioPartial = useCallback(
+    (partial: Parameters<typeof updateAudioTrack>[1]) => {
+      if (selectedAudioId) updateAudioTrack(selectedAudioId, partial);
+    },
+    [selectedAudioId, updateAudioTrack]
+  );
+  const handleRemoveAudioSelected = useCallback(() => {
+    if (selectedAudioId) removeAudioTrack(selectedAudioId);
+  }, [selectedAudioId, removeAudioTrack]);
+
+  const handleUpdateTextPartial = useCallback(
+    (partial: Parameters<typeof updateTextLayer>[1]) => {
+      if (selectedTextId) updateTextLayer(selectedTextId, partial);
+    },
+    [selectedTextId, updateTextLayer]
+  );
+  const handleRemoveTextSelected = useCallback(() => {
+    if (selectedTextId) removeTextLayer(selectedTextId);
+  }, [selectedTextId, removeTextLayer]);
+
+  const handleUpdateOverlayPartial = useCallback(
+    (partial: Parameters<typeof updateOverlayLayer>[1]) => {
+      if (selectedOverlayId) updateOverlayLayer(selectedOverlayId, partial);
+    },
+    [selectedOverlayId, updateOverlayLayer]
+  );
+  const handleRemoveOverlaySelected = useCallback(() => {
+    if (selectedOverlayId) removeOverlayLayer(selectedOverlayId);
+  }, [selectedOverlayId, removeOverlayLayer]);
+
+  // Toolbar tab switchers
+  const handleTrimTab = useCallback(() => setClipTab("video"), [setClipTab]);
+  const handleSpeedTab = useCallback(() => setClipTab("speed"), [setClipTab]);
+  const handleAudioTab = useCallback(() => setClipTab("audio"), [setClipTab]);
+  const handleFiltersTab = useCallback(() => {
+    setClipTab("adjust");
+    setSidebarTab("filters");
+  }, [setClipTab, setSidebarTab]);
+  const handleAdjustTab = useCallback(() => setClipTab("adjust"), [setClipTab]);
+  const handleAddMediaClick = useCallback(() => setSidebarTab("media"), [setSidebarTab]);
+
+  const handleSplitCurrentTime = useCallback(() => {
+    splitClipAtTime();
+  }, [splitClipAtTime]);
+
+  // Mobile Handlers
+  const handleOpenMobileSheet = useCallback((sheet: MobileSheetType) => {
     setMobileSheet(sheet);
-  };
+  }, [setMobileSheet]);
+  const handleCloseMobileSheet = useCallback(() => {
+    setMobileSheet(null);
+  }, [setMobileSheet]);
+
+  const handleMobileTrim = useCallback(() => handleOpenMobileSheet("clip_edit"), [handleOpenMobileSheet]);
+  const handleMobileSpeed = useCallback(() => handleOpenMobileSheet("speed"), [handleOpenMobileSheet]);
+  const handleMobileFilters = useCallback(() => handleOpenMobileSheet("filters"), [handleOpenMobileSheet]);
+  const handleMobileAdjust = useCallback(() => handleOpenMobileSheet("adjust"), [handleOpenMobileSheet]);
+  const handleMobileAddMedia = useCallback(() => handleOpenMobileSheet("media"), [handleOpenMobileSheet]);
+
+  const handleMobileDeleteSelected = useCallback(() => {
+    handleDeleteSelected();
+    setMobileSheet(null);
+  }, [handleDeleteSelected, setMobileSheet]);
+
+  // Transition Modal Helpers
+  const transitionClip = useMemo(
+    () => project.clips.find((c) => c.id === transitionClipId),
+    [project.clips, transitionClipId]
+  );
+  const handleApplyTransition = useCallback(
+    (trans: ClipTransition | undefined) => {
+      if (transitionClipId) {
+        updateClip(transitionClipId, { transition: trans });
+      }
+    },
+    [transitionClipId, updateClip]
+  );
+  const handleCloseTransitionModal = useCallback(() => setTransitionClipId(null), []);
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-950 text-white select-none overflow-hidden">
@@ -379,48 +497,164 @@ export function VideoEditorWorkspace() {
         aspectRatio={project.settings.aspectRatio}
         canExport={project.clips.length > 0}
         onProjectTitleChange={setProjectTitle}
-        onAspectRatioChange={(ratio) => setAspectRatio(ratio)}
-        onExportClick={() => setIsExportModalOpen(true)}
-        onSettingsClick={() => setIsSettingsOpen(true)}
-        onHelpClick={() => setIsHelpOpen(true)}
+        onAspectRatioChange={handleAspectRatioChange}
+        onExportClick={handleOpenExportModal}
+        onSettingsClick={handleOpenSettings}
+        onHelpClick={handleOpenHelp}
       />
 
-      {/* ========================================================================= */}
-      {/* DESKTOP LAYOUT (4-column Studio Workspace: Sidebar + Drawer + Center + Right) */}
-      {/* ========================================================================= */}
-      <div className="hidden lg:flex flex-col flex-1 min-h-0 w-full overflow-hidden">
-        {/* Upper Studio: Sidebar, Drawer, Dominant Preview Player, Properties Panel */}
-        <div className="flex flex-1 min-h-0 w-full overflow-hidden border-b border-white/10">
-          {/* Col 1: Vertical Sidebar (80px) */}
-          <EditorSidebar
-            activeTab={sidebarTab}
-            onSelectTab={(tab) => setSidebarTab(tab)}
-          />
+      {/* Conditional Layout: Mount either Desktop Studio or Mobile Layout */}
+      {isDesktop ? (
+        /* ========================================================================= */
+        /* DESKTOP LAYOUT (4-column Studio Workspace: Sidebar + Drawer + Center + Right) */
+        /* ========================================================================= */
+        <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden">
+          {/* Upper Studio: Sidebar, Drawer, Dominant Preview Player, Properties Panel */}
+          <div className="flex flex-1 min-h-0 w-full overflow-hidden border-b border-white/10">
+            {/* Col 1: Vertical Sidebar (80px) */}
+            <EditorSidebar
+              activeTab={sidebarTab}
+              onSelectTab={setSidebarTab}
+            />
 
-          {/* Col 2: Contextual Tool Drawer (300px) */}
-          <EditorToolDrawer
-            activeTab={sidebarTab}
-            project={project}
-            currentTime={currentTime}
-            onAddAsset={addAsset}
-            onRemoveAsset={removeAsset}
-            onAddClipToTimeline={(assetId) => addClipFromAsset(assetId)}
-            onAddAudioToTimeline={(assetId) => addAudioTrack(assetId, currentTime)}
-            onAddOverlayToTimeline={(assetId) => addOverlayLayer(assetId, currentTime)}
-            onAddTextLayer={(time, text) => addTextLayer(time || currentTime, text || "Sample Title")}
-            onApplyFilterPreset={(filter) => {
-              if (selectedClipId) updateClip(selectedClipId, { filterPreset: filter as FilterPreset });
-            }}
-            selectedClipFilterPreset={selectedClip?.filterPreset}
-            onApplyTransition={(trans) => {
-              if (selectedClipId) updateClip(selectedClipId, { transition: { type: trans, duration: 0.5 } });
-            }}
-            onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-            onUpdateTitle={(title) => setProjectTitle(title)}
-          />
+            {/* Col 2: Contextual Tool Drawer (300px) */}
+            <EditorToolDrawer
+              activeTab={sidebarTab}
+              project={project}
+              onAddAsset={addAsset}
+              onRemoveAsset={removeAsset}
+              onAddClipToTimeline={handleAddClipFromAsset}
+              onAddAudioToTimeline={handleAddAudioAtCurrent}
+              onAddOverlayToTimeline={handleAddOverlayAtCurrent}
+              onAddTextLayer={handleAddTextAtCurrent}
+              onApplyFilterPreset={handleApplyFilterPreset}
+              selectedClipFilterPreset={selectedClip?.filterPreset}
+              onApplyTransition={handleApplyDrawerTransition}
+              onSetAspectRatio={handleAspectRatioChange}
+              onUpdateTitle={setProjectTitle}
+            />
 
-          {/* Col 3: Center Stage: Dominant Preview Canvas (Flexible width & height) */}
-          <div className="flex-1 flex flex-col min-w-0 h-full bg-slate-950/60 p-2 sm:p-3 overflow-hidden">
+            {/* Col 3: Center Stage: Dominant Preview Canvas (Flexible width & height) */}
+            <div className="flex-1 flex flex-col min-w-0 h-full bg-slate-950/60 p-2 sm:p-3 overflow-hidden">
+              <CanvasPreview
+                project={project}
+                currentTime={currentTime}
+                totalDuration={totalDuration}
+                isPlaying={isPlaying}
+                onTimeUpdate={setCurrentTime}
+                onTogglePlay={togglePlay}
+                onSeek={seekTo}
+                onUpdateSettings={handleUpdateSettings}
+                onOpenSettings={handleOpenSettings}
+                selectedOverlayId={selectedOverlayId}
+                onSelectOverlay={selectOverlay}
+                onUpdateOverlay={updateOverlayLayer}
+                onDeleteOverlay={removeOverlayLayer}
+                selectedTextId={selectedTextId}
+                onSelectText={selectText}
+                onUpdateText={updateTextLayer}
+              />
+            </div>
+
+            {/* Col 4: Right Properties Inspector (320px) */}
+            <RightPropertiesPanel
+              project={project}
+              selectedClip={selectedClip}
+              selectedAudio={selectedAudio}
+              selectedText={selectedText}
+              selectedOverlay={selectedOverlay}
+              activeTab={clipTab}
+              onTabChange={setClipTab}
+              onUpdateClip={handleUpdateClipPartial}
+              onUpdateAudio={handleUpdateAudioPartial}
+              onRemoveAudio={handleRemoveAudioSelected}
+              onUpdateText={handleUpdateTextPartial}
+              onRemoveText={handleRemoveTextSelected}
+              onUpdateOverlay={handleUpdateOverlayPartial}
+              onRemoveOverlay={handleRemoveOverlaySelected}
+              onSetAspectRatio={handleAspectRatioChange}
+              onDeleteSelected={handleDeleteSelected}
+              onReverseClip={handleReverseSelected}
+              onFreezeFrame={handleFreezeFrameSelected}
+            />
+          </div>
+
+          {/* Row 2: Full-width Mid Editing Toolbar spanning directly above the timeline */}
+          <div className="w-full shrink-0 border-b border-white/10 bg-slate-950">
+            <EditorToolbar
+              selectedClip={selectedClip}
+              hasSelectedClip={Boolean(selectedClipId)}
+              hasSelectedItem={hasSelectedItem}
+              canSplit={canSplit}
+              onSplit={handleSplitCurrentTime}
+              onDelete={handleDeleteSelected}
+              onDuplicate={handleDuplicateSelected}
+              onTrim={handleTrimTab}
+              onCrop={handleTrimTab}
+              onSpeed={handleSpeedTab}
+              onVolume={handleAudioTab}
+              onFilters={handleFiltersTab}
+              onAdjust={handleAdjustTab}
+              onReverse={handleReverseSelected}
+              onFreezeFrame={handleFreezeFrameSelected}
+            />
+          </div>
+
+          {/* Row 3: Full-width Docked Timeline */}
+          <div className="w-full h-[224px] shrink-0 overflow-hidden bg-slate-950">
+            <Timeline
+              project={project}
+              currentTime={currentTime}
+              totalDuration={totalDuration}
+              selectedClipId={selectedClipId}
+              selectedAudioId={selectedAudioId}
+              selectedTextId={selectedTextId}
+              selectedOverlayId={selectedOverlayId}
+              zoom={timelineZoom}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onSeek={seekTo}
+              onSelectClip={selectClip}
+              onSelectAudio={selectAudio}
+              onSelectText={selectText}
+              onSelectOverlay={selectOverlay}
+              onSplit={splitClipAtTime}
+              onTrimClip={trimClip}
+              onDuplicate={handleDuplicateSelected}
+              onDelete={handleDeleteSelected}
+              onUndo={undo}
+              onRedo={redo}
+              onZoomChange={setTimelineZoom}
+              onOpenTransitionModal={setTransitionClipId}
+              onToggleTrackVisibility={toggleTrackVisibility}
+              onToggleTrackLock={toggleTrackLock}
+              onAddMediaClick={handleAddMediaClick}
+              hideTopToolbar={true}
+            />
+          </div>
+
+          {/* Row 4: Status Bar */}
+          <div className="w-full shrink-0">
+            <EditorStatusBar
+              project={project}
+              totalDuration={totalDuration}
+              zoom={timelineZoom}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={undo}
+              onRedo={redo}
+              onZoomChange={setTimelineZoom}
+              onOpenSettings={handleOpenSettings}
+            />
+          </div>
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* MOBILE PORTRAIT LAYOUT (320px - 430px Responsive Stacked Experience) */
+        /* ========================================================================= */
+        <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden bg-slate-950">
+          {/* Preview Player Stage */}
+          <div className="flex-1 min-h-0 w-full p-2 overflow-hidden flex flex-col items-center justify-center">
             <CanvasPreview
               project={project}
               currentTime={currentTime}
@@ -429,436 +663,273 @@ export function VideoEditorWorkspace() {
               onTimeUpdate={setCurrentTime}
               onTogglePlay={togglePlay}
               onSeek={seekTo}
-              onUpdateSettings={(settings) => {
-                if (settings.aspectRatio) setAspectRatio(settings.aspectRatio);
-              }}
-              onOpenSettings={() => setIsSettingsOpen(true)}
+              onUpdateSettings={handleUpdateSettings}
+              onOpenSettings={handleOpenSettings}
               selectedOverlayId={selectedOverlayId}
-              onSelectOverlay={(id) => selectOverlay(id)}
-              onUpdateOverlay={(id, partial) => updateOverlayLayer(id, partial)}
-              onDeleteOverlay={(id) => removeOverlayLayer(id)}
+              onSelectOverlay={selectOverlay}
+              onUpdateOverlay={updateOverlayLayer}
+              onDeleteOverlay={removeOverlayLayer}
               selectedTextId={selectedTextId}
-              onSelectText={(id) => selectText(id)}
-              onUpdateText={(id, partial) => updateTextLayer(id, partial)}
+              onSelectText={selectText}
+              onUpdateText={updateTextLayer}
             />
           </div>
 
-          {/* Col 4: Right Properties Inspector (320px) */}
-          <RightPropertiesPanel
-            project={project}
-            selectedClip={selectedClip}
-            selectedAudio={selectedAudio}
-            selectedText={selectedText}
-            selectedOverlay={selectedOverlay}
-            activeTab={clipTab}
-            onTabChange={(t: ClipPropertyTab) => setClipTab(t)}
-            onUpdateClip={(partial) => {
-              if (selectedClipId) updateClip(selectedClipId, partial);
-            }}
-            onUpdateAudio={(partial) => {
-              if (selectedAudioId) updateAudioTrack(selectedAudioId, partial);
-            }}
-            onRemoveAudio={() => {
-              if (selectedAudioId) removeAudioTrack(selectedAudioId);
-            }}
-            onUpdateText={(partial) => {
-              if (selectedTextId) updateTextLayer(selectedTextId, partial);
-            }}
-            onRemoveText={() => {
-              if (selectedTextId) removeTextLayer(selectedTextId);
-            }}
-            onUpdateOverlay={(partial) => {
-              if (selectedOverlayId) updateOverlayLayer(selectedOverlayId, partial);
-            }}
-            onRemoveOverlay={() => {
-              if (selectedOverlayId) removeOverlayLayer(selectedOverlayId);
-            }}
-            onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-            onDeleteSelected={handleDeleteSelected}
-            onReverseClip={handleReverseSelected}
-            onFreezeFrame={handleFreezeFrameSelected}
-          />
-        </div>
-
-        {/* Row 2: Full-width Mid Editing Toolbar spanning directly above the timeline */}
-        <div className="w-full shrink-0 border-b border-white/10 bg-slate-950">
-          <EditorToolbar
-            selectedClip={selectedClip}
-            hasSelectedClip={Boolean(selectedClipId)}
-            hasSelectedItem={hasSelectedItem}
-            canSplit={canSplit}
-            onSplit={() => splitClipAtTime(currentTime)}
-            onDelete={handleDeleteSelected}
-            onDuplicate={handleDuplicateSelected}
-            onTrim={() => setClipTab("video")}
-            onCrop={() => setClipTab("video")}
-            onSpeed={() => setClipTab("speed")}
-            onVolume={() => setClipTab("audio")}
-            onFilters={() => {
-              setClipTab("adjust");
-              setSidebarTab("filters");
-            }}
-            onAdjust={() => setClipTab("adjust")}
-            onReverse={handleReverseSelected}
-            onFreezeFrame={handleFreezeFrameSelected}
-          />
-        </div>
-
-        {/* Row 3: Full-width Docked Timeline */}
-        <div className="w-full h-[224px] shrink-0 overflow-hidden bg-slate-950">
-          <Timeline
-            project={project}
-            currentTime={currentTime}
-            totalDuration={totalDuration}
-            selectedClipId={selectedClipId}
-            selectedAudioId={selectedAudioId}
-            selectedTextId={selectedTextId}
-            selectedOverlayId={selectedOverlayId}
-            zoom={timelineZoom}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onSeek={seekTo}
-            onSelectClip={(id) => selectClip(id)}
-            onSelectAudio={(id) => selectAudio(id)}
-            onSelectText={(id) => selectText(id)}
-            onSelectOverlay={(id) => selectOverlay(id)}
-            onSplit={(t) => splitClipAtTime(t)}
-            onTrimClip={(id, start, end) => trimClip(id, start, end)}
-            onDuplicate={handleDuplicateSelected}
-            onDelete={handleDeleteSelected}
-            onUndo={undo}
-            onRedo={redo}
-            onZoomChange={setTimelineZoom}
-            onOpenTransitionModal={(id) => setTransitionClipId(id)}
-            onToggleTrackVisibility={(track) => toggleTrackVisibility(track)}
-            onToggleTrackLock={(track) => toggleTrackLock(track)}
-            onAddMediaClick={() => setSidebarTab("media")}
-            hideTopToolbar={true}
-          />
-        </div>
-
-        {/* Row 4: Status Bar */}
-        <div className="w-full shrink-0">
-          <EditorStatusBar
-            project={project}
-            totalDuration={totalDuration}
-            zoom={timelineZoom}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUndo={undo}
-            onRedo={redo}
-            onZoomChange={setTimelineZoom}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-          />
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* MOBILE PORTRAIT LAYOUT (320px - 430px Responsive Stacked Experience) */}
-      {/* ========================================================================= */}
-      <div className="flex lg:hidden flex-col flex-1 min-h-0 w-full overflow-hidden bg-slate-950">
-        {/* Preview Player Stage */}
-        <div className="flex-1 min-h-0 w-full p-2 overflow-hidden flex flex-col items-center justify-center">
-          <CanvasPreview
-            project={project}
-            currentTime={currentTime}
-            totalDuration={totalDuration}
-            isPlaying={isPlaying}
-            onTimeUpdate={setCurrentTime}
-            onTogglePlay={togglePlay}
-            onSeek={seekTo}
-            onUpdateSettings={(settings) => {
-              if (settings.aspectRatio) setAspectRatio(settings.aspectRatio);
-            }}
-            selectedOverlayId={selectedOverlayId}
-            onSelectOverlay={(id) => selectOverlay(id)}
-            onUpdateOverlay={(id, partial) => updateOverlayLayer(id, partial)}
-            onDeleteOverlay={(id) => removeOverlayLayer(id)}
-            selectedTextId={selectedTextId}
-            onSelectText={(id) => selectText(id)}
-            onUpdateText={(id, partial) => updateTextLayer(id, partial)}
-          />
-        </div>
-
-        {/* Compact Mid Editing Toolbar */}
-        <div className="w-full shrink-0 border-t border-white/10 bg-slate-950">
-          <EditorToolbar
-            selectedClip={selectedClip}
-            hasSelectedClip={Boolean(selectedClipId)}
-            hasSelectedItem={hasSelectedItem}
-            canSplit={canSplit}
-            onSplit={() => splitClipAtTime(currentTime)}
-            onDelete={handleDeleteSelected}
-            onDuplicate={handleDuplicateSelected}
-            onTrim={() => handleOpenMobileSheet("clip_edit")}
-            onCrop={() => handleOpenMobileSheet("clip_edit")}
-            onSpeed={() => handleOpenMobileSheet("speed")}
-            onVolume={() => handleOpenMobileSheet("clip_edit")}
-            onFilters={() => handleOpenMobileSheet("filters")}
-            onAdjust={() => handleOpenMobileSheet("adjust")}
-            onReverse={handleReverseSelected}
-            onFreezeFrame={handleFreezeFrameSelected}
-          />
-        </div>
-
-        {/* Contained Timeline with touch scrubbing */}
-        <div className="w-full h-[150px] shrink-0 border-t border-white/10 bg-slate-950 overflow-hidden">
-          <Timeline
-            project={project}
-            currentTime={currentTime}
-            totalDuration={totalDuration}
-            selectedClipId={selectedClipId}
-            selectedAudioId={selectedAudioId}
-            selectedTextId={selectedTextId}
-            selectedOverlayId={selectedOverlayId}
-            zoom={Math.min(timelineZoom, 35)}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onSeek={seekTo}
-            onSelectClip={(id) => selectClip(id)}
-            onSelectAudio={(id) => selectAudio(id)}
-            onSelectText={(id) => selectText(id)}
-            onSelectOverlay={(id) => selectOverlay(id)}
-            onSplit={(t) => splitClipAtTime(t)}
-            onTrimClip={(id, start, end) => trimClip(id, start, end)}
-            onDuplicate={handleDuplicateSelected}
-            onDelete={handleDeleteSelected}
-            onUndo={undo}
-            onRedo={redo}
-            onZoomChange={setTimelineZoom}
-            onOpenTransitionModal={(id) => setTransitionClipId(id)}
-            onToggleTrackVisibility={(track) => toggleTrackVisibility(track)}
-            onToggleTrackLock={(track) => toggleTrackLock(track)}
-            onAddMediaClick={() => handleOpenMobileSheet("media")}
-            hideTopToolbar={true}
-          />
-        </div>
-
-        {/* Mobile Fixed Bottom Nav */}
-        <MobileBottomNav
-          hasSelectedClip={Boolean(selectedClipId)}
-          canSplit={canSplit}
-          onOpenSheet={handleOpenMobileSheet}
-          onSplit={() => splitClipAtTime(currentTime)}
-          onDelete={handleDeleteSelected}
-        />
-
-        {/* Mobile Slide-up Bottom Sheets */}
-        <MobileBottomSheet
-          isOpen={Boolean(mobileSheet)}
-          type={mobileSheet}
-          title={
-            mobileSheet === "media"
-              ? "Project Media"
-              : mobileSheet === "audio"
-              ? "Background Music & Audio"
-              : mobileSheet === "text"
-              ? "Text & Titles"
-              : mobileSheet === "stickers"
-              ? "Stickers & Overlays"
-              : mobileSheet === "filters"
-              ? "Filter Presets"
-              : mobileSheet === "adjust"
-              ? "Color Adjustments"
-              : mobileSheet === "speed"
-              ? "Playback Speed"
-              : mobileSheet === "clip_edit"
-              ? "Clip Properties"
-              : mobileSheet === "settings"
-              ? "Project Settings"
-              : "Tools"
-          }
-          onClose={() => setMobileSheet(null)}
-        >
-          {mobileSheet === "media" && (
-            <EditorToolDrawer
-              activeTab="media"
-              project={project}
-              currentTime={currentTime}
-              onAddAsset={addAsset}
-              onRemoveAsset={removeAsset}
-              onAddClipToTimeline={(assetId) => {
-                addClipFromAsset(assetId);
-                setMobileSheet(null);
-              }}
-              onAddAudioToTimeline={(assetId) => {
-                addAudioTrack(assetId, currentTime);
-                setMobileSheet(null);
-              }}
-              onAddOverlayToTimeline={(assetId) => {
-                addOverlayLayer(assetId, currentTime);
-                setMobileSheet(null);
-              }}
-              onAddTextLayer={(time, text) => addTextLayer(time || currentTime, text || "Sample Title")}
-              onApplyFilterPreset={(filter) => {
-                if (selectedClipId) updateClip(selectedClipId, { filterPreset: filter as FilterPreset });
-              }}
-              selectedClipFilterPreset={selectedClip?.filterPreset}
-              onApplyTransition={(trans) => {
-                if (selectedClipId) updateClip(selectedClipId, { transition: { type: trans, duration: 0.5 } });
-              }}
-              onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-              onUpdateTitle={(title) => setProjectTitle(title)}
-            />
-          )}
-
-          {mobileSheet === "audio" && (
-            <EditorToolDrawer
-              activeTab="audio"
-              project={project}
-              currentTime={currentTime}
-              onAddAsset={addAsset}
-              onRemoveAsset={removeAsset}
-              onAddClipToTimeline={() => {}}
-              onAddAudioToTimeline={(assetId) => {
-                addAudioTrack(assetId, currentTime);
-                setMobileSheet(null);
-              }}
-              onAddOverlayToTimeline={() => {}}
-              onAddTextLayer={() => {}}
-              onApplyFilterPreset={() => {}}
-              onApplyTransition={() => {}}
-              onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-              onUpdateTitle={(title) => setProjectTitle(title)}
-            />
-          )}
-
-          {mobileSheet === "text" && (
-            <EditorToolDrawer
-              activeTab="text"
-              project={project}
-              currentTime={currentTime}
-              onAddAsset={addAsset}
-              onRemoveAsset={removeAsset}
-              onAddClipToTimeline={() => {}}
-              onAddAudioToTimeline={() => {}}
-              onAddOverlayToTimeline={() => {}}
-              onAddTextLayer={(time, text) => {
-                addTextLayer(time || currentTime, text || "Sample Title");
-                setMobileSheet(null);
-              }}
-              onApplyFilterPreset={() => {}}
-              onApplyTransition={() => {}}
-              onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-              onUpdateTitle={(title) => setProjectTitle(title)}
-            />
-          )}
-
-          {mobileSheet === "stickers" && (
-            <EditorToolDrawer
-              activeTab="stickers"
-              project={project}
-              currentTime={currentTime}
-              onAddAsset={addAsset}
-              onRemoveAsset={removeAsset}
-              onAddClipToTimeline={() => {}}
-              onAddAudioToTimeline={() => {}}
-              onAddOverlayToTimeline={(assetId) => {
-                addOverlayLayer(assetId, currentTime);
-                setMobileSheet(null);
-              }}
-              onAddTextLayer={() => {}}
-              onApplyFilterPreset={() => {}}
-              onApplyTransition={() => {}}
-              onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-              onUpdateTitle={(title) => setProjectTitle(title)}
-            />
-          )}
-
-          {mobileSheet === "filters" && (
-            <EditorToolDrawer
-              activeTab="filters"
-              project={project}
-              currentTime={currentTime}
-              onAddAsset={addAsset}
-              onRemoveAsset={removeAsset}
-              onAddClipToTimeline={() => {}}
-              onAddAudioToTimeline={() => {}}
-              onAddOverlayToTimeline={() => {}}
-              onAddTextLayer={() => {}}
-              onApplyFilterPreset={(preset) => {
-                if (selectedClipId) updateClip(selectedClipId, { filterPreset: preset as FilterPreset });
-              }}
-              selectedClipFilterPreset={selectedClip?.filterPreset}
-              onApplyTransition={() => {}}
-              onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-              onUpdateTitle={(title) => setProjectTitle(title)}
-            />
-          )}
-
-          {(mobileSheet === "adjust" || mobileSheet === "speed" || mobileSheet === "clip_edit") && (
-            <RightPropertiesPanel
-              project={project}
+          {/* Compact Mid Editing Toolbar */}
+          <div className="w-full shrink-0 border-t border-white/10 bg-slate-950">
+            <EditorToolbar
               selectedClip={selectedClip}
-              selectedAudio={selectedAudio}
-              selectedText={selectedText}
-              selectedOverlay={selectedOverlay}
-              activeTab={
-                mobileSheet === "speed"
-                  ? "speed"
-                  : mobileSheet === "adjust"
-                  ? "adjust"
-                  : "video"
-              }
-              onTabChange={(t: ClipPropertyTab) => setClipTab(t)}
-              onUpdateClip={(partial) => {
-                if (selectedClipId) updateClip(selectedClipId, partial);
-              }}
-              onUpdateAudio={(partial) => {
-                if (selectedAudioId) updateAudioTrack(selectedAudioId, partial);
-              }}
-              onRemoveAudio={() => {
-                if (selectedAudioId) removeAudioTrack(selectedAudioId);
-              }}
-              onUpdateText={(partial) => {
-                if (selectedTextId) updateTextLayer(selectedTextId, partial);
-              }}
-              onRemoveText={() => {
-                if (selectedTextId) removeTextLayer(selectedTextId);
-              }}
-              onUpdateOverlay={(partial) => {
-                if (selectedOverlayId) updateOverlayLayer(selectedOverlayId, partial);
-              }}
-              onRemoveOverlay={() => {
-                if (selectedOverlayId) removeOverlayLayer(selectedOverlayId);
-              }}
-              onSetAspectRatio={(ratio) => setAspectRatio(ratio)}
-              onDeleteSelected={() => {
-                handleDeleteSelected();
-                setMobileSheet(null);
-              }}
-              onReverseClip={handleReverseSelected}
+              hasSelectedClip={Boolean(selectedClipId)}
+              hasSelectedItem={hasSelectedItem}
+              canSplit={canSplit}
+              onSplit={handleSplitCurrentTime}
+              onDelete={handleDeleteSelected}
+              onDuplicate={handleDuplicateSelected}
+              onTrim={handleMobileTrim}
+              onCrop={handleMobileTrim}
+              onSpeed={handleMobileSpeed}
+              onVolume={handleMobileTrim}
+              onFilters={handleMobileFilters}
+              onAdjust={handleMobileAdjust}
+              onReverse={handleReverseSelected}
               onFreezeFrame={handleFreezeFrameSelected}
             />
-          )}
+          </div>
 
-          {mobileSheet === "settings" && (
-            <div className="space-y-4 p-2">
-              <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-2">
-                  Canvas Aspect Ratio
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["16:9", "9:16", "1:1", "4:5"] as AspectRatioPreset[]).map((ratio) => (
-                    <button
-                      key={ratio}
-                      type="button"
-                      onClick={() => setAspectRatio(ratio)}
-                      className={`p-2.5 rounded-xl border text-xs font-semibold transition ${
-                        project.settings.aspectRatio === ratio
-                          ? "border-cyan-400 bg-cyan-400/20 text-cyan-300"
-                          : "border-white/10 bg-slate-900 text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      {ratio}
-                    </button>
-                  ))}
+          {/* Contained Timeline with touch scrubbing */}
+          <div className="w-full h-[150px] shrink-0 border-t border-white/10 bg-slate-950 overflow-hidden">
+            <Timeline
+              project={project}
+              currentTime={currentTime}
+              totalDuration={totalDuration}
+              selectedClipId={selectedClipId}
+              selectedAudioId={selectedAudioId}
+              selectedTextId={selectedTextId}
+              selectedOverlayId={selectedOverlayId}
+              zoom={Math.min(timelineZoom, 35)}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onSeek={seekTo}
+              onSelectClip={selectClip}
+              onSelectAudio={selectAudio}
+              onSelectText={selectText}
+              onSelectOverlay={selectOverlay}
+              onSplit={splitClipAtTime}
+              onTrimClip={trimClip}
+              onDuplicate={handleDuplicateSelected}
+              onDelete={handleDeleteSelected}
+              onUndo={undo}
+              onRedo={redo}
+              onZoomChange={setTimelineZoom}
+              onOpenTransitionModal={setTransitionClipId}
+              onToggleTrackVisibility={toggleTrackVisibility}
+              onToggleTrackLock={toggleTrackLock}
+              onAddMediaClick={handleMobileAddMedia}
+              hideTopToolbar={true}
+            />
+          </div>
+
+          {/* Mobile Fixed Bottom Nav */}
+          <MobileBottomNav
+            hasSelectedClip={Boolean(selectedClipId)}
+            canSplit={canSplit}
+            onOpenSheet={handleOpenMobileSheet}
+            onSplit={handleSplitCurrentTime}
+            onDelete={handleDeleteSelected}
+          />
+
+          {/* Mobile Slide-up Bottom Sheets */}
+          <MobileBottomSheet
+            isOpen={Boolean(mobileSheet)}
+            type={mobileSheet}
+            title={
+              mobileSheet === "media"
+                ? "Project Media"
+                : mobileSheet === "audio"
+                ? "Background Music & Audio"
+                : mobileSheet === "text"
+                ? "Text & Titles"
+                : mobileSheet === "stickers"
+                ? "Stickers & Overlays"
+                : mobileSheet === "filters"
+                ? "Filter Presets"
+                : mobileSheet === "adjust"
+                ? "Color Adjustments"
+                : mobileSheet === "speed"
+                ? "Playback Speed"
+                : mobileSheet === "clip_edit"
+                ? "Clip Properties"
+                : mobileSheet === "settings"
+                ? "Project Settings"
+                : "Tools"
+            }
+            onClose={handleCloseMobileSheet}
+          >
+            {mobileSheet === "media" && (
+              <EditorToolDrawer
+                activeTab="media"
+                project={project}
+                onAddAsset={addAsset}
+                onRemoveAsset={removeAsset}
+                onAddClipToTimeline={(assetId) => {
+                  handleAddClipFromAsset(assetId);
+                  handleCloseMobileSheet();
+                }}
+                onAddAudioToTimeline={(assetId) => {
+                  handleAddAudioAtCurrent(assetId);
+                  handleCloseMobileSheet();
+                }}
+                onAddOverlayToTimeline={(assetId) => {
+                  handleAddOverlayAtCurrent(assetId);
+                  handleCloseMobileSheet();
+                }}
+                onAddTextLayer={(time, text) => {
+                  handleAddTextAtCurrent(time, text);
+                  handleCloseMobileSheet();
+                }}
+                onApplyFilterPreset={handleApplyFilterPreset}
+                selectedClipFilterPreset={selectedClip?.filterPreset}
+                onApplyTransition={handleApplyDrawerTransition}
+                onSetAspectRatio={handleAspectRatioChange}
+                onUpdateTitle={setProjectTitle}
+              />
+            )}
+
+            {mobileSheet === "audio" && (
+              <EditorToolDrawer
+                activeTab="audio"
+                project={project}
+                onAddAsset={addAsset}
+                onRemoveAsset={removeAsset}
+                onAddClipToTimeline={() => {}}
+                onAddAudioToTimeline={(assetId) => {
+                  handleAddAudioAtCurrent(assetId);
+                  handleCloseMobileSheet();
+                }}
+                onAddOverlayToTimeline={() => {}}
+                onAddTextLayer={() => {}}
+                onApplyFilterPreset={() => {}}
+                onApplyTransition={() => {}}
+                onSetAspectRatio={handleAspectRatioChange}
+                onUpdateTitle={setProjectTitle}
+              />
+            )}
+
+            {mobileSheet === "text" && (
+              <EditorToolDrawer
+                activeTab="text"
+                project={project}
+                onAddAsset={addAsset}
+                onRemoveAsset={removeAsset}
+                onAddClipToTimeline={() => {}}
+                onAddAudioToTimeline={() => {}}
+                onAddOverlayToTimeline={() => {}}
+                onAddTextLayer={(time, text) => {
+                  handleAddTextAtCurrent(time, text);
+                  handleCloseMobileSheet();
+                }}
+                onApplyFilterPreset={() => {}}
+                onApplyTransition={() => {}}
+                onSetAspectRatio={handleAspectRatioChange}
+                onUpdateTitle={setProjectTitle}
+              />
+            )}
+
+            {mobileSheet === "stickers" && (
+              <EditorToolDrawer
+                activeTab="stickers"
+                project={project}
+                onAddAsset={addAsset}
+                onRemoveAsset={removeAsset}
+                onAddClipToTimeline={() => {}}
+                onAddAudioToTimeline={() => {}}
+                onAddOverlayToTimeline={(assetId) => {
+                  handleAddOverlayAtCurrent(assetId);
+                  handleCloseMobileSheet();
+                }}
+                onAddTextLayer={() => {}}
+                onApplyFilterPreset={() => {}}
+                onApplyTransition={() => {}}
+                onSetAspectRatio={handleAspectRatioChange}
+                onUpdateTitle={setProjectTitle}
+              />
+            )}
+
+            {mobileSheet === "filters" && (
+              <EditorToolDrawer
+                activeTab="filters"
+                project={project}
+                onAddAsset={addAsset}
+                onRemoveAsset={removeAsset}
+                onAddClipToTimeline={() => {}}
+                onAddAudioToTimeline={() => {}}
+                onAddOverlayToTimeline={() => {}}
+                onAddTextLayer={() => {}}
+                onApplyFilterPreset={handleApplyFilterPreset}
+                selectedClipFilterPreset={selectedClip?.filterPreset}
+                onApplyTransition={() => {}}
+                onSetAspectRatio={handleAspectRatioChange}
+                onUpdateTitle={setProjectTitle}
+              />
+            )}
+
+            {(mobileSheet === "adjust" || mobileSheet === "speed" || mobileSheet === "clip_edit") && (
+              <RightPropertiesPanel
+                project={project}
+                selectedClip={selectedClip}
+                selectedAudio={selectedAudio}
+                selectedText={selectedText}
+                selectedOverlay={selectedOverlay}
+                activeTab={
+                  mobileSheet === "speed"
+                    ? "speed"
+                    : mobileSheet === "adjust"
+                    ? "adjust"
+                    : "video"
+                }
+                onTabChange={setClipTab}
+                onUpdateClip={handleUpdateClipPartial}
+                onUpdateAudio={handleUpdateAudioPartial}
+                onRemoveAudio={handleRemoveAudioSelected}
+                onUpdateText={handleUpdateTextPartial}
+                onRemoveText={handleRemoveTextSelected}
+                onUpdateOverlay={handleUpdateOverlayPartial}
+                onRemoveOverlay={handleRemoveOverlaySelected}
+                onSetAspectRatio={handleAspectRatioChange}
+                onDeleteSelected={handleMobileDeleteSelected}
+                onReverseClip={handleReverseSelected}
+                onFreezeFrame={handleFreezeFrameSelected}
+              />
+            )}
+
+            {mobileSheet === "settings" && (
+              <div className="space-y-4 p-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-2">
+                    Canvas Aspect Ratio
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["16:9", "9:16", "1:1", "4:5"] as AspectRatioPreset[]).map((ratio) => (
+                      <button
+                        key={ratio}
+                        type="button"
+                        onClick={() => handleAspectRatioChange(ratio)}
+                        className={`p-2.5 rounded-xl border text-xs font-semibold transition ${
+                          project.settings.aspectRatio === ratio
+                            ? "border-cyan-400 bg-cyan-400/20 text-cyan-300"
+                            : "border-white/10 bg-slate-900 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {ratio}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </MobileBottomSheet>
-      </div>
+            )}
+          </MobileBottomSheet>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* MODALS: Export, Transitions, Help / Shortcuts, Settings */}
@@ -869,7 +940,7 @@ export function VideoEditorWorkspace() {
         <TransitionModal
           isOpen={Boolean(transitionClipId)}
           initialTransition={transitionClip.transition}
-          onClose={() => setTransitionClipId(null)}
+          onClose={handleCloseTransitionModal}
           onApply={handleApplyTransition}
         />
       )}
@@ -878,14 +949,14 @@ export function VideoEditorWorkspace() {
       <ExportModal
         isOpen={isExportModalOpen}
         project={project}
-        onClose={() => setIsExportModalOpen(false)}
+        onClose={handleCloseExportModal}
         onExport={handleExportProject}
       />
 
       {/* Shortcuts & Help Modal */}
       {isHelpOpen && (
         <div
-          onClick={() => setIsHelpOpen(false)}
+          onClick={handleCloseHelp}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
         >
           <div
@@ -899,7 +970,7 @@ export function VideoEditorWorkspace() {
               </div>
               <button
                 type="button"
-                onClick={() => setIsHelpOpen(false)}
+                onClick={handleCloseHelp}
                 className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition"
               >
                 <X className="h-4 w-4" />
@@ -935,7 +1006,7 @@ export function VideoEditorWorkspace() {
       {/* Project Settings Modal */}
       {isSettingsOpen && (
         <div
-          onClick={() => setIsSettingsOpen(false)}
+          onClick={handleCloseSettings}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
         >
           <div
@@ -946,7 +1017,7 @@ export function VideoEditorWorkspace() {
               <h3 className="text-sm font-bold">Project & Canvas Settings</h3>
               <button
                 type="button"
-                onClick={() => setIsSettingsOpen(false)}
+                onClick={handleCloseSettings}
                 className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition"
               >
                 <X className="h-4 w-4" />
@@ -961,7 +1032,7 @@ export function VideoEditorWorkspace() {
                     <button
                       key={ratio}
                       type="button"
-                      onClick={() => setAspectRatio(ratio)}
+                      onClick={() => handleAspectRatioChange(ratio)}
                       className={`p-2.5 rounded-xl border text-xs font-semibold transition ${
                         project.settings.aspectRatio === ratio
                           ? "border-cyan-400 bg-cyan-400/20 text-cyan-300"
@@ -984,7 +1055,7 @@ export function VideoEditorWorkspace() {
               <div className="pt-2 border-t border-white/10 flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setIsSettingsOpen(false)}
+                  onClick={handleCloseSettings}
                   className="px-4 py-2 rounded-xl bg-cyan-400 text-slate-950 font-bold hover:bg-cyan-300 transition"
                 >
                   Done

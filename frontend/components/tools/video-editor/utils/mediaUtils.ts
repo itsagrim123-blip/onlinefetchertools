@@ -184,24 +184,25 @@ export function captureVideoFrame(
 ): { blob: Blob; dataUrl: string } | null {
   try {
     const canvas = document.createElement("canvas");
-    canvas.width = videoElement.videoWidth || 1920;
-    canvas.height = videoElement.videoHeight || 1080;
+    const width = videoElement.videoWidth || 1920;
+    const height = videoElement.videoHeight || 1080;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(videoElement, 0, 0, width, height);
     const mime = format === "png" ? "image/png" : "image/jpeg";
     const dataUrl = canvas.toDataURL(mime, 0.95);
 
-    // Convert dataURL to Blob
-    const arr = dataUrl.split(",");
-    const byteString = atob(arr[1]);
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i);
+    // Fast DataURL to Blob conversion using typed array
+    const base64Data = dataUrl.split(",")[1];
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Uint8Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
-    const blob = new Blob([ab], { type: mime });
+    const blob = new Blob([byteNumbers], { type: mime });
 
     return { blob, dataUrl };
   } catch (err) {
@@ -226,9 +227,7 @@ export async function extractFilmstripFrames(
 
     const frames: string[] = [];
     const canvas = document.createElement("canvas");
-    canvas.width = 96;
-    canvas.height = 54;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
 
     let resolved = false;
     const cleanup = () => {
@@ -240,10 +239,16 @@ export async function extractFilmstripFrames(
       }
     };
 
-    const timeout = setTimeout(cleanup, 6000);
+    const timeout = setTimeout(cleanup, 5000);
 
     video.onloadedmetadata = () => {
       const dur = video.duration && !isNaN(video.duration) ? video.duration : 5;
+      const aspect = (video.videoWidth || 16) / (video.videoHeight || 9);
+      const targetW = 88;
+      const targetH = Math.max(36, Math.min(64, Math.round(targetW / aspect)));
+      canvas.width = targetW;
+      canvas.height = targetH;
+
       const step = dur / (frameCount + 1);
       let currentIdx = 1;
 
@@ -259,8 +264,8 @@ export async function extractFilmstripFrames(
       video.onseeked = () => {
         if (ctx) {
           try {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            frames.push(canvas.toDataURL("image/jpeg", 0.6));
+            ctx.drawImage(video, 0, 0, targetW, targetH);
+            frames.push(canvas.toDataURL("image/jpeg", 0.5));
           } catch {
             // Ignore capture error
           }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useRef, useState } from "react";
+import { memo, ChangeEvent, useRef, useState } from "react";
 import {
   Film,
   Music,
@@ -33,7 +33,7 @@ import { extractFilmstripFrames, probeMediaFile } from "../utils/mediaUtils";
 interface EditorToolDrawerProps {
   activeTab: SidebarTab;
   project: VideoProject;
-  currentTime: number;
+  currentTime?: number;
   onAddAsset: (
     file: File,
     type: MediaType,
@@ -55,7 +55,7 @@ interface EditorToolDrawerProps {
   onUpdateTitle: (title: string) => void;
 }
 
-export function EditorToolDrawer({
+export const EditorToolDrawer = memo(function EditorToolDrawer({
   activeTab,
   project,
   currentTime,
@@ -534,5 +534,5 @@ export function EditorToolDrawer({
       )}
     </div>
   );
-}
+});
 

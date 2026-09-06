@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { ChevronLeft, Folder, HelpCircle, Settings, Upload, Video } from "lucide-react";
 import { AspectRatioPreset } from "../types";
@@ -19,7 +20,7 @@ interface EditorTopBarProps {
   onHelpClick?: () => void;
 }
 
-export function EditorTopBar({
+export const EditorTopBar = memo(function EditorTopBar({
   projectTitle,
   aspectRatio,
   canExport = true,
@@ -138,5 +139,5 @@ export function EditorTopBar({
       </div>
     </header>
   );
-}
+});
 

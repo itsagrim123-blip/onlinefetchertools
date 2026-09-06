@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActiveToolTab,
   AspectRatioPreset,
@@ -105,6 +105,12 @@ export function useProjectState(initial?: VideoProject) {
   // Computed ranges & total duration
   const clipRanges = useMemo(() => computeClipTimeRanges(project.clips), [project.clips]);
   const totalDuration = useMemo(() => getTotalProjectDuration(project), [project]);
+
+  // Synchronous refs for ultra-fast stable callbacks without re-render tearing
+  const currentTimeRef = useRef<number>(currentTime);
+  currentTimeRef.current = currentTime;
+  const totalDurationRef = useRef<number>(totalDuration);
+  totalDurationRef.current = totalDuration;
 
   // Push to undo stack
   const updateProjectWithHistory = useCallback((updater: (prev: VideoProject) => VideoProject) => {
@@ -325,7 +331,8 @@ export function useProjectState(initial?: VideoProject) {
   );
 
   const splitClipAtTime = useCallback(
-    (timelineTime: number, clipIdToSplit?: string) => {
+    (timelineTime?: number, clipIdToSplit?: string) => {
+      const time = timelineTime !== undefined ? timelineTime : currentTimeRef.current;
       updateProjectWithHistory((prev) => {
         const ranges = computeClipTimeRanges(prev.clips);
         let targetRange: ClipTimeRange | undefined;
@@ -333,18 +340,18 @@ export function useProjectState(initial?: VideoProject) {
         if (clipIdToSplit) {
           targetRange = ranges.find((r) => r.clip.id === clipIdToSplit);
         } else {
-          targetRange = ranges.find((r) => timelineTime >= r.startTime && timelineTime <= r.endTime);
+          targetRange = ranges.find((r) => time >= r.startTime && time <= r.endTime);
         }
 
         if (!targetRange) return prev;
 
         const { clip, startTime, endTime, index } = targetRange;
         // Don't split if too close to boundaries (less than 0.15s)
-        if (timelineTime <= startTime + 0.15 || timelineTime >= endTime - 0.15) {
+        if (time <= startTime + 0.15 || time >= endTime - 0.15) {
           return prev;
         }
 
-        const elapsed = timelineTime - startTime;
+        const elapsed = time - startTime;
         const speed = Math.max(0.1, clip.speed || 1.0);
         const splitSourceOffset = clip.startTrim + elapsed * speed;
 
@@ -396,7 +403,8 @@ export function useProjectState(initial?: VideoProject) {
 
   // Freeze Frame: splits current clip and inserts still frame
   const insertFreezeFrame = useCallback(
-    (clipId: string, timelineTime: number, frameDataUrl?: string, freezeDuration: number = 3.0) => {
+    (clipId: string, timelineTime?: number, frameDataUrl?: string, freezeDuration: number = 3.0) => {
+      const time = timelineTime !== undefined ? timelineTime : currentTimeRef.current;
       const fallbackDataUrl =
         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
       const safeDataUrl = frameDataUrl || fallbackDataUrl;
@@ -419,7 +427,7 @@ export function useProjectState(initial?: VideoProject) {
           if (!target) return prev;
 
           const { clip, startTime, index } = target;
-          const elapsed = Math.max(0, timelineTime - startTime);
+          const elapsed = Math.max(0, time - startTime);
           const splitOffset = clip.startTrim + elapsed * (clip.speed || 1.0);
 
           const clipA: VideoClip = { ...clip, endTrim: splitOffset };
@@ -450,11 +458,12 @@ export function useProjectState(initial?: VideoProject) {
 
   // --- Audio Track Operations ---
   const addAudioTrack = useCallback(
-    (assetId: string, timelineStart: number = 0) => {
+    (assetId: string, timelineStart?: number) => {
+      const start = timelineStart !== undefined ? timelineStart : currentTimeRef.current;
       updateProjectWithHistory((prev) => {
         const asset = prev.assets.find((a) => a.id === assetId);
         if (!asset) return prev;
-        const newTrack = createDefaultAudioTrack(asset, timelineStart);
+        const newTrack = createDefaultAudioTrack(asset, start);
         setSelectedAudioId(newTrack.id);
         setSidebarTab("audio");
         return {
@@ -490,7 +499,7 @@ export function useProjectState(initial?: VideoProject) {
   // --- Text Layer Operations ---
   const addTextLayer = useCallback(
     (timelineStart?: number, text: string = "Happy Birthday") => {
-      const start = timelineStart !== undefined ? timelineStart : currentTime;
+      const start = timelineStart !== undefined ? timelineStart : currentTimeRef.current;
       updateProjectWithHistory((prev) => {
         const newLayer = createDefaultTextLayer(start, 4.0);
         newLayer.text = text;
@@ -502,7 +511,7 @@ export function useProjectState(initial?: VideoProject) {
         };
       });
     },
-    [currentTime, updateProjectWithHistory]
+    [updateProjectWithHistory]
   );
 
   const updateTextLayer = useCallback(
@@ -529,7 +538,7 @@ export function useProjectState(initial?: VideoProject) {
   // --- Overlay Layer Operations ---
   const addOverlayLayer = useCallback(
     (assetId: string, timelineStart?: number) => {
-      const start = timelineStart !== undefined ? timelineStart : currentTime;
+      const start = timelineStart !== undefined ? timelineStart : currentTimeRef.current;
       updateProjectWithHistory((prev) => {
         const asset = prev.assets.find((a) => a.id === assetId);
         if (!asset || asset.type === "audio") return prev;
@@ -542,7 +551,7 @@ export function useProjectState(initial?: VideoProject) {
         };
       });
     },
-    [currentTime, updateProjectWithHistory]
+    [updateProjectWithHistory]
   );
 
   const updateOverlayLayer = useCallback(
@@ -604,22 +613,21 @@ export function useProjectState(initial?: VideoProject) {
   );
 
   // --- Playback & Selection Controls ---
-  const seekTo = useCallback(
-    (time: number) => {
-      const clamped = Math.max(0, Math.min(totalDuration, time));
-      setCurrentTime(clamped);
-    },
-    [totalDuration]
-  );
+  const seekTo = useCallback((time: number) => {
+    const clamped = Math.max(0, Math.min(totalDurationRef.current, time));
+    setCurrentTime(clamped);
+  }, []);
 
   const togglePlay = useCallback(() => {
     setIsPlaying((prev) => {
-      if (!prev && currentTime >= totalDuration && totalDuration > 0) {
+      const cTime = currentTimeRef.current;
+      const duration = totalDurationRef.current;
+      if (!prev && cTime >= duration && duration > 0) {
         setCurrentTime(0);
       }
       return !prev;
     });
-  }, [currentTime, totalDuration]);
+  }, []);
 
   const selectClip = useCallback((id: string | null) => {
     setSelectedClipId(id);

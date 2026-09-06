@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   FastForward,
   RotateCcw,
@@ -23,7 +23,7 @@ interface TimelineClipItemProps {
   isLastClip: boolean;
 }
 
-export function TimelineClipItem({
+export const TimelineClipItem = memo(function TimelineClipItem({
   clip,
   isSelected,
   zoom,
@@ -200,5 +200,5 @@ export function TimelineClipItem({
       )}
     </div>
   );
-}
+});
 

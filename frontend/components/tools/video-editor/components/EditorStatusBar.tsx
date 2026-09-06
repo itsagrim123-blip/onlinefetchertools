@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Minus, Plus, RotateCcw, RotateCw, Settings } from "lucide-react";
 import { formatTimecode } from "../state/projectDefaults";
 import { VideoProject } from "../types";
@@ -16,7 +17,7 @@ interface EditorStatusBarProps {
   onOpenSettings?: () => void;
 }
 
-export function EditorStatusBar({
+export const EditorStatusBar = memo(function EditorStatusBar({
   project,
   totalDuration,
   zoom,
@@ -107,5 +108,5 @@ export function EditorStatusBar({
       </div>
     </footer>
   );
-}
+});
 

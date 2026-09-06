@@ -1,5 +1,4 @@
-"use client";
-
+import { memo } from "react";
 import { Volume2, VolumeX, Sliders, Trash2 } from "lucide-react";
 import { AudioTrackItem } from "../../types";
 
@@ -9,7 +8,7 @@ interface AudioInspectorProps {
   onRemoveTrack: () => void;
 }
 
-export function AudioInspector({
+export const AudioInspector = memo(function AudioInspector({
   track,
   onUpdateTrack,
   onRemoveTrack,
@@ -114,5 +113,5 @@ export function AudioInspector({
       </div>
     </div>
   );
-}
+});
 

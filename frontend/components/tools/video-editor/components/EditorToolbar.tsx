@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import {
   Copy,
   Crop,
@@ -39,7 +39,7 @@ interface EditorToolbarProps {
   onFreezeFrame?: () => void;
 }
 
-export function EditorToolbar({
+export const EditorToolbar = memo(function EditorToolbar({
   selectedClip,
   hasSelectedClip,
   hasSelectedItem,
@@ -213,4 +213,4 @@ export function EditorToolbar({
       </div>
     </div>
   );
-}
+});

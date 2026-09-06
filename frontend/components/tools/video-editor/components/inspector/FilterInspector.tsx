@@ -1,5 +1,4 @@
-"use client";
-
+import { memo } from "react";
 import { Sparkles, Sliders, RotateCcw } from "lucide-react";
 import { VideoClip } from "../../types";
 
@@ -19,7 +18,7 @@ const FILTER_PRESETS = [
   { id: "contrast", label: "Contrast" },
 ];
 
-export function FilterInspector({ clip, onUpdateClip }: FilterInspectorProps) {
+export const FilterInspector = memo(function FilterInspector({ clip, onUpdateClip }: FilterInspectorProps) {
   const handleReset = () => {
     onUpdateClip({
       filterPreset: "original",
@@ -125,5 +124,5 @@ export function FilterInspector({ clip, onUpdateClip }: FilterInspectorProps) {
       </div>
     </div>
   );
-}
+});
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { memo, ReactNode, useEffect } from "react";
 import { X } from "lucide-react";
 import { MobileSheetType } from "../../types";
 import { useUISound } from "@/lib/sounds/useUISound";
@@ -13,7 +13,7 @@ interface MobileBottomSheetProps {
   children: ReactNode;
 }
 
-export function MobileBottomSheet({
+export const MobileBottomSheet = memo(function MobileBottomSheet({
   isOpen,
   title,
   onClose,
@@ -70,5 +70,5 @@ export function MobileBottomSheet({
       </div>
     </div>
   );
-}
+});
 

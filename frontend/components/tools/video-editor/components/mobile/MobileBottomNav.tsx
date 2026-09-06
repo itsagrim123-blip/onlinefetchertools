@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   FolderPlus,
   Music,
@@ -23,7 +24,7 @@ interface MobileBottomNavProps {
   onDelete: () => void;
 }
 
-export function MobileBottomNav({
+export const MobileBottomNav = memo(function MobileBottomNav({
   hasSelectedClip,
   canSplit,
   onOpenSheet,
@@ -157,5 +158,5 @@ export function MobileBottomNav({
       </button>
     </nav>
   );
-}
+});
 
