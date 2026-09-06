@@ -57,16 +57,50 @@ interface RightPropertiesPanelProps {
   onDeleteSelected?: () => void;
   onReverseClip?: () => void;
   onFreezeFrame?: () => void;
+  onExtractAudio?: (clipId: string) => void;
+  onDuplicateSelected?: () => void;
 }
 
 const SPEED_PRESETS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 4.0];
-const COLOR_PRESETS = ["#ffffff", "#facc15", "#22d3ee", "#f43f5e", "#4ade80", "#0f172a"];
+const COLOR_PRESETS = ["#ffffff", "#facc15", "#22d3ee", "#f43f5e", "#4ade80", "#a855f7", "#fb923c", "#0f172a"];
+const FONT_FAMILIES = [
+  "Arial",
+  "Inter",
+  "Roboto",
+  "Impact",
+  "Georgia",
+  "Courier New",
+  "Times New Roman",
+  "Trebuchet MS",
+];
+
 const ANIMATIONS: { id: TextAnimationType; label: string }[] = [
   { id: "none", label: "None" },
   { id: "fade", label: "Fade" },
   { id: "slide_bottom", label: "Slide Up" },
+  { id: "slide_top", label: "Slide Down" },
+  { id: "slide_left", label: "Slide Left" },
+  { id: "slide_right", label: "Slide Right" },
   { id: "scale_up", label: "Pop" },
 ];
+
+const VOICE_EFFECTS = [
+  { id: "none", label: "Normal" },
+  { id: "deep", label: "Deep / Male" },
+  { id: "high", label: "High / Chipmunk" },
+  { id: "robot", label: "Robot" },
+  { id: "echo", label: "Echo / Reverb" },
+  { id: "radio", label: "Radio Vintage" },
+] as const;
+
+const BLEND_MODES = [
+  { id: "normal", label: "Normal" },
+  { id: "multiply", label: "Multiply" },
+  { id: "screen", label: "Screen" },
+  { id: "overlay", label: "Overlay" },
+  { id: "darken", label: "Darken" },
+  { id: "lighten", label: "Lighten" },
+] as const;
 
 export const RightPropertiesPanel = memo(function RightPropertiesPanel({
   project,
@@ -89,6 +123,8 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
   onDeleteSelected,
   onReverseClip,
   onFreezeFrame,
+  onExtractAudio,
+  onDuplicateSelected,
 }: RightPropertiesPanelProps) {
   const currentTab: ClipPropertyTab = clipTab || activeTab || "video";
   const handleSelectTab = onSelectClipTab || onTabChange || (() => {});
@@ -115,7 +151,7 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-300">Text</label>
+          <label className="text-xs font-medium text-slate-300">Text Content</label>
           <textarea
             rows={2}
             value={selectedText.text}
@@ -124,15 +160,31 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
           />
         </div>
 
+        {/* Font Family Selector */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-300">Font Family</label>
+          <select
+            value={selectedText.fontFamily || "Arial"}
+            onChange={(e) => onUpdateText({ fontFamily: e.target.value })}
+            className="w-full h-8 rounded-xl border border-white/10 bg-slate-900 px-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+          >
+            {FONT_FAMILIES.map((font) => (
+              <option key={font} value={font} style={{ fontFamily: font }}>
+                {font}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-300">Font Size</span>
-            <span className="text-xs font-mono text-cyan-300">{selectedText.fontSize}px</span>
+            <span className="text-xs font-mono text-cyan-300 font-bold">{selectedText.fontSize}px</span>
           </div>
           <input
             type="range"
             min="14"
-            max="72"
+            max="96"
             value={selectedText.fontSize}
             onChange={(e) => onUpdateText({ fontSize: parseInt(e.target.value) || 28 })}
             className="w-full accent-cyan-400 cursor-pointer"
@@ -148,6 +200,7 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
               className={`h-7 w-7 flex items-center justify-center rounded-lg transition ${
                 selectedText.isBold ? "bg-cyan-400 text-slate-950 font-bold" : "text-slate-400 hover:text-white"
               }`}
+              title="Bold"
             >
               <Bold className="h-3.5 w-3.5" />
             </button>
@@ -157,6 +210,7 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
               className={`h-7 w-7 flex items-center justify-center rounded-lg transition ${
                 selectedText.isItalic ? "bg-cyan-400 text-slate-950 font-bold" : "text-slate-400 hover:text-white"
               }`}
+              title="Italic"
             >
               <Italic className="h-3.5 w-3.5" />
             </button>
@@ -175,6 +229,7 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                       ? "bg-cyan-400 text-slate-950"
                       : "text-slate-400 hover:text-white"
                   }`}
+                  title={`Align ${align}`}
                 >
                   <Icon className="h-3.5 w-3.5" />
                 </button>
@@ -183,10 +238,10 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
           </div>
         </div>
 
-        {/* Colors */}
+        {/* Text Colors */}
         <div className="space-y-1.5 pt-1 border-t border-white/10">
-          <label className="text-xs text-slate-300">Color</label>
-          <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-300">Text Color</label>
+          <div className="flex items-center gap-2 flex-wrap">
             {COLOR_PRESETS.map((color) => (
               <button
                 key={color}
@@ -195,17 +250,44 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                 style={{ backgroundColor: color }}
                 className={`h-6 w-6 rounded-full border transition ${
                   selectedText.fontColor.toLowerCase() === color.toLowerCase()
-                    ? "border-cyan-400 ring-2 ring-cyan-400/50"
-                    : "border-white/20"
+                    ? "border-cyan-400 ring-2 ring-cyan-400/50 scale-110"
+                    : "border-white/20 hover:scale-105"
                 }`}
               />
             ))}
           </div>
         </div>
 
+        {/* Text Stroke / Outline */}
+        <div className="space-y-2 pt-2 border-t border-white/10">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-300">Text Stroke / Border</span>
+            <span className="text-xs font-mono text-cyan-300">{selectedText.strokeWidth || 0}px</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min="0"
+              max="8"
+              value={selectedText.strokeWidth || 0}
+              onChange={(e) => onUpdateText({ strokeWidth: parseInt(e.target.value) || 0 })}
+              className="flex-1 accent-cyan-400 cursor-pointer"
+            />
+            {(selectedText.strokeWidth || 0) > 0 && (
+              <input
+                type="color"
+                value={selectedText.strokeColor || "#000000"}
+                onChange={(e) => onUpdateText({ strokeColor: e.target.value })}
+                className="h-6 w-6 rounded cursor-pointer border border-white/20 bg-transparent"
+                title="Stroke Color"
+              />
+            )}
+          </div>
+        </div>
+
         {/* Animation */}
-        <div className="space-y-1.5 pt-1 border-t border-white/10">
-          <label className="text-xs text-slate-300">Animation</label>
+        <div className="space-y-1.5 pt-2 border-t border-white/10">
+          <label className="text-xs text-slate-300">Text Animation</label>
           <div className="grid grid-cols-2 gap-1.5">
             {ANIMATIONS.map((anim) => (
               <button
@@ -214,7 +296,7 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                 onClick={() => onUpdateText({ animation: anim.id })}
                 className={`h-8 rounded-lg text-xs font-medium transition ${
                   selectedText.animation === anim.id
-                    ? "bg-cyan-400 text-slate-950 font-bold"
+                    ? "bg-cyan-400 text-slate-950 font-bold shadow-md shadow-cyan-950/30"
                     : "bg-slate-900 border border-white/10 text-slate-400 hover:text-white"
                 }`}
               >
@@ -223,6 +305,19 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
             ))}
           </div>
         </div>
+
+        {/* Duplicate Action */}
+        {onDuplicateSelected && (
+          <div className="pt-2 border-t border-white/10">
+            <button
+              type="button"
+              onClick={onDuplicateSelected}
+              className="flex items-center justify-center gap-1.5 w-full h-8 px-3 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10 transition"
+            >
+              Duplicate Text Layer
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -299,6 +394,56 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
             />
           </div>
         </div>
+
+        {/* Voice Effects Section */}
+        <div className="space-y-1.5 pt-2 border-t border-white/10">
+          <label className="text-xs text-slate-300">Voice Effect Preset</label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {VOICE_EFFECTS.map((fx) => (
+              <button
+                key={fx.id}
+                type="button"
+                onClick={() => onUpdateAudio({ voiceEffect: fx.id })}
+                className={`h-8 rounded-lg text-xs font-medium transition ${
+                  (selectedAudio.voiceEffect || "none") === fx.id
+                    ? "bg-purple-500 text-white font-bold shadow-md shadow-purple-950/30"
+                    : "bg-slate-900 border border-white/10 text-slate-400 hover:text-white"
+                }`}
+              >
+                {fx.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Noise Reduction Toggle */}
+        <div className="pt-2 border-t border-white/10">
+          <button
+            type="button"
+            onClick={() => onUpdateAudio({ noiseReduction: !selectedAudio.noiseReduction })}
+            className={`flex items-center justify-between w-full h-9 px-3 rounded-xl border text-xs font-medium transition ${
+              selectedAudio.noiseReduction
+                ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
+                : "border-white/10 bg-slate-900 text-slate-300 hover:bg-white/5"
+            }`}
+          >
+            <span>AI Noise Reduction (Denoise)</span>
+            <span className="font-mono">{selectedAudio.noiseReduction ? "ON" : "OFF"}</span>
+          </button>
+        </div>
+
+        {/* Duplicate Action */}
+        {onDuplicateSelected && (
+          <div className="pt-2 border-t border-white/10">
+            <button
+              type="button"
+              onClick={onDuplicateSelected}
+              className="flex items-center justify-center gap-1.5 w-full h-8 px-3 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10 transition"
+            >
+              Duplicate Audio Track
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -327,6 +472,27 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
         <div className="p-2.5 rounded-xl border border-amber-400/20 bg-amber-400/10 text-xs text-amber-200/90 flex items-start gap-2">
           <Move className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
           <span>Click and drag this sticker directly on the video preview screen to place it anywhere!</span>
+        </div>
+
+        {/* Blend Mode Selector */}
+        <div className="space-y-1.5">
+          <label className="text-xs text-slate-300">Blend Mode</label>
+          <div className="grid grid-cols-3 gap-1">
+            {BLEND_MODES.map((bm) => (
+              <button
+                key={bm.id}
+                type="button"
+                onClick={() => onUpdateOverlay({ blendMode: bm.id })}
+                className={`h-7 rounded-lg text-[11px] font-medium transition ${
+                  (selectedOverlay.blendMode || "normal") === bm.id
+                    ? "bg-amber-400 text-slate-950 font-bold"
+                    : "bg-slate-900 border border-white/10 text-slate-400 hover:text-white"
+                }`}
+              >
+                {bm.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Scale */}
@@ -463,6 +629,19 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
             className="w-full accent-amber-400 cursor-pointer"
           />
         </div>
+
+        {/* Duplicate Action */}
+        {onDuplicateSelected && (
+          <div className="pt-2 border-t border-white/10">
+            <button
+              type="button"
+              onClick={onDuplicateSelected}
+              className="flex items-center justify-center gap-1.5 w-full h-8 px-3 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10 transition"
+            >
+              Duplicate Overlay Layer
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -533,30 +712,40 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                   </div>
                   <input
                     type="range"
-                    min="50"
-                    max="200"
+                    min="20"
+                    max="300"
                     value={Math.round((selectedClip.scale || 1) * 100)}
                     onChange={(e) => onUpdateClip({ scale: parseFloat(e.target.value) / 100 })}
                     className="w-full accent-cyan-400 cursor-pointer"
                   />
                 </div>
 
-                {/* Rotate & Flip */}
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <span className="text-slate-400">Rotate</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-slate-200 bg-slate-900 px-2.5 py-1 rounded-lg border border-white/10">
-                      {selectedClip.rotation || 0}°
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onUpdateClip({ rotation: ((selectedClip.rotation || 0) + 90) % 360 })}
-                      className="p-1.5 rounded-lg border border-white/10 bg-slate-900 hover:bg-white/5"
-                      title="Rotate 90°"
-                    >
-                      <RotateCw className="h-3.5 w-3.5 text-slate-300" />
-                    </button>
+                {/* Rotate Slider & Quick 90° */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Rotation</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-cyan-300 font-bold bg-slate-900 px-2 py-0.5 rounded-lg border border-white/10">
+                        {selectedClip.rotation || 0}°
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateClip({ rotation: ((selectedClip.rotation || 0) + 90) % 360 })}
+                        className="p-1 rounded-lg border border-white/10 bg-slate-900 hover:bg-white/5"
+                        title="Rotate 90°"
+                      >
+                        <RotateCw className="h-3 w-3 text-slate-300" />
+                      </button>
+                    </div>
                   </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    value={selectedClip.rotation || 0}
+                    onChange={(e) => onUpdateClip({ rotation: parseInt(e.target.value) || 0 })}
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between text-xs pt-1">
@@ -603,12 +792,6 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                     <option value="1:1">1:1 Square</option>
                     <option value="4:5">4:5 Vertical</option>
                   </select>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 h-9 px-3 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-300 hover:bg-white/10 shrink-0"
-                  >
-                    <Crop className="h-3.5 w-3.5" /> Edit Crop
-                  </button>
                 </div>
               </div>
 
@@ -633,7 +816,7 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                 </div>
               </div>
 
-              {/* Opacity Slider matching reference image */}
+              {/* Opacity Slider */}
               <div className="space-y-1.5 pt-3 border-t border-white/10">
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-400">Opacity</span>
@@ -718,6 +901,20 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                   />
                 </div>
               </div>
+
+              {/* Extract Audio Button */}
+              {onExtractAudio && selectedClip.type === "video" && (
+                <div className="pt-2 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => onExtractAudio(selectedClip.id)}
+                    className="flex items-center justify-center gap-1.5 w-full h-9 px-3 rounded-xl border border-purple-400/30 bg-purple-500/10 hover:bg-purple-500/20 text-xs font-semibold text-purple-200 transition"
+                  >
+                    <Volume2 className="h-3.5 w-3.5 text-purple-400" />
+                    Separate Audio to Timeline Track
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -745,6 +942,23 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Custom Speed Slider */}
+              <div className="space-y-1.5 pt-2 border-t border-white/10">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Custom Speed</span>
+                  <span className="text-cyan-300 font-mono font-bold">{selectedClip.speed.toFixed(2)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="4.0"
+                  step="0.05"
+                  value={selectedClip.speed}
+                  onChange={(e) => onUpdateClip({ speed: parseFloat(e.target.value) || 1.0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
               </div>
 
               {/* Reverse & Freeze Frame */}
@@ -784,11 +998,42 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                 <span className="text-xs font-semibold text-slate-300">Color Adjustments</span>
                 <button
                   type="button"
-                  onClick={() => onUpdateClip({ brightness: 0, contrast: 0, saturation: 0 })}
-                  className="text-[11px] text-slate-400 hover:text-white"
+                  onClick={() =>
+                    onUpdateClip({
+                      brightness: 0,
+                      contrast: 0,
+                      saturation: 0,
+                      exposure: 0,
+                      temperature: 0,
+                      tint: 0,
+                      highlights: 0,
+                      shadows: 0,
+                      vignette: 0,
+                      grain: 0,
+                    })
+                  }
+                  className="text-[11px] text-slate-400 hover:text-cyan-300"
                 >
-                  Reset
+                  Reset All
                 </button>
+              </div>
+
+              {/* Exposure */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Exposure</span>
+                  <span className="text-cyan-300 font-mono font-bold">
+                    {(selectedClip.exposure || 0) > 0 ? `+${selectedClip.exposure}` : selectedClip.exposure || 0}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="-100"
+                  max="100"
+                  value={selectedClip.exposure || 0}
+                  onChange={(e) => onUpdateClip({ exposure: parseInt(e.target.value) || 0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
               </div>
 
               {/* Brightness */}
@@ -841,6 +1086,110 @@ export const RightPropertiesPanel = memo(function RightPropertiesPanel({
                   max="100"
                   value={selectedClip.saturation}
                   onChange={(e) => onUpdateClip({ saturation: parseInt(e.target.value) || 0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+              </div>
+
+              {/* Temperature */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Temperature (Cool / Warm)</span>
+                  <span className="text-cyan-300 font-mono font-bold">
+                    {(selectedClip.temperature || 0) > 0 ? `+${selectedClip.temperature}` : selectedClip.temperature || 0}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="-100"
+                  max="100"
+                  value={selectedClip.temperature || 0}
+                  onChange={(e) => onUpdateClip({ temperature: parseInt(e.target.value) || 0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+              </div>
+
+              {/* Tint */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Tint (Green / Magenta)</span>
+                  <span className="text-cyan-300 font-mono font-bold">
+                    {(selectedClip.tint || 0) > 0 ? `+${selectedClip.tint}` : selectedClip.tint || 0}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="-100"
+                  max="100"
+                  value={selectedClip.tint || 0}
+                  onChange={(e) => onUpdateClip({ tint: parseInt(e.target.value) || 0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+              </div>
+
+              {/* Highlights */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Highlights</span>
+                  <span className="text-cyan-300 font-mono font-bold">
+                    {(selectedClip.highlights || 0) > 0 ? `+${selectedClip.highlights}` : selectedClip.highlights || 0}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="-100"
+                  max="100"
+                  value={selectedClip.highlights || 0}
+                  onChange={(e) => onUpdateClip({ highlights: parseInt(e.target.value) || 0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+              </div>
+
+              {/* Shadows */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Shadows</span>
+                  <span className="text-cyan-300 font-mono font-bold">
+                    {(selectedClip.shadows || 0) > 0 ? `+${selectedClip.shadows}` : selectedClip.shadows || 0}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="-100"
+                  max="100"
+                  value={selectedClip.shadows || 0}
+                  onChange={(e) => onUpdateClip({ shadows: parseInt(e.target.value) || 0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+              </div>
+
+              {/* Vignette */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Vignette</span>
+                  <span className="text-cyan-300 font-mono font-bold">{selectedClip.vignette || 0}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={selectedClip.vignette || 0}
+                  onChange={(e) => onUpdateClip({ vignette: parseInt(e.target.value) || 0 })}
+                  className="w-full accent-cyan-400 cursor-pointer"
+                />
+              </div>
+
+              {/* Grain */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Film Grain</span>
+                  <span className="text-cyan-300 font-mono font-bold">{selectedClip.grain || 0}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={selectedClip.grain || 0}
+                  onChange={(e) => onUpdateClip({ grain: parseInt(e.target.value) || 0 })}
                   className="w-full accent-cyan-400 cursor-pointer"
                 />
               </div>

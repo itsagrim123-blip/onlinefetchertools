@@ -32,7 +32,9 @@ def compute_canvas_dimensions(manifest: VideoProjectManifest) -> Tuple[int, int]
         base_w, base_h = 1920, 1080
 
     scale_factor = 1.0
-    if res == "720p":
+    if res == "1440p":
+        scale_factor = 1440.0 / 1080.0
+    elif res == "720p":
         scale_factor = 720.0 / 1080.0
     elif res == "480p":
         scale_factor = 480.0 / 1080.0
@@ -45,6 +47,24 @@ def compute_canvas_dimensions(manifest: VideoProjectManifest) -> Tuple[int, int]
     target_h = target_h if target_h % 2 == 0 else target_h + 1
 
     return target_w, target_h
+
+
+def build_voice_and_noise_filters(voice_effect: str = "none", noise_reduction: bool = False) -> list[str]:
+    """Constructs audio DSP filter chain for voice changer presets and noise reduction."""
+    filters: list[str] = []
+    if noise_reduction:
+        filters.append("afftdn=nf=-25")
+    if voice_effect == "deep":
+        filters.append("asetrate=44100*0.8,aresample=44100,atempo=1.25")
+    elif voice_effect == "high":
+        filters.append("asetrate=44100*1.25,aresample=44100,atempo=0.8")
+    elif voice_effect == "robot":
+        filters.append("flanger=delay=10:depth=5:regen=70:width=70:speed=0.5")
+    elif voice_effect == "echo":
+        filters.append("aecho=0.8:0.88:60:0.4")
+    elif voice_effect == "radio":
+        filters.append("highpass=f=300,lowpass=f=3000")
+    return filters
 
 
 def find_system_font() -> str | None:
@@ -160,12 +180,16 @@ def build_ffmpeg_command(
             if clip.is_reversed:
                 v_filters.append("reverse")
 
-            # Transforms: scale & pad into canvas
+            # Transforms: scale & pad into canvas with offset
             scale_val = clip.scale or 1.0
             v_filters.append(
                 f"scale={canvas_w}*{scale_val}:{canvas_h}*{scale_val}:force_original_aspect_ratio=decrease"
             )
-            v_filters.append(f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:black")
+            off_x = clip.offset_x or 0.0
+            off_y = clip.offset_y or 0.0
+            pad_x = f"(ow-iw)/2+({off_x:.2f}*ow/100)"
+            pad_y = f"(oh-ih)/2+({off_y:.2f}*oh/100)"
+            v_filters.append(f"pad={canvas_w}:{canvas_h}:{pad_x}:{pad_y}:black")
 
             # Rotation & Flips
             if clip.rotation == 90:
@@ -174,13 +198,16 @@ def build_ffmpeg_command(
                 v_filters.append("hflip,vflip")
             elif clip.rotation == 270:
                 v_filters.append("transpose=2")
+            elif clip.rotation != 0:
+                v_filters.append(f"rotate={clip.rotation}*PI/180:c=black:ow='hypot(iw,ih)':oh=ow")
+                v_filters.append(f"scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=decrease,pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:black")
 
             if clip.flip_horizontal:
                 v_filters.append("hflip")
             if clip.flip_vertical:
                 v_filters.append("vflip")
 
-            # Filters / Color adjustments
+            # Filters / Color presets
             if clip.filter_preset == "warm":
                 v_filters.append("eq=saturation=1.2,colorbalance=rs=0.08:gs=-0.03:bs=-0.08")
             elif clip.filter_preset == "cool":
@@ -195,13 +222,42 @@ def build_ffmpeg_command(
                 v_filters.append("eq=brightness=0.12:contrast=1.05")
             elif clip.filter_preset == "contrast":
                 v_filters.append("eq=contrast=1.3")
+            elif clip.filter_preset == "cinematic":
+                v_filters.append("eq=contrast=1.18:saturation=1.1,colorbalance=rs=0.04:gs=-0.02:bs=0.08")
+            elif clip.filter_preset == "retro":
+                v_filters.append("curves=vintage,colorbalance=rs=0.08:gs=0.04:bs=-0.08,eq=saturation=0.9")
+            elif clip.filter_preset == "film":
+                v_filters.append("eq=contrast=1.12:saturation=0.88,colorbalance=rs=0.05:bs=-0.05")
+            elif clip.filter_preset == "soft":
+                v_filters.append("boxblur=1:1,eq=brightness=0.04:contrast=0.95")
 
-            # Custom user brightness, contrast, saturation
-            if clip.brightness != 0 or clip.contrast != 0 or clip.saturation != 0:
-                b_val = (clip.brightness / 100.0) * 0.4
-                c_val = 1.0 + (clip.contrast / 100.0) * 0.5
-                s_val = max(0.0, 1.0 + (clip.saturation / 100.0))
+            # Custom user brightness, contrast, saturation, exposure, highlights, shadows
+            b_val = (clip.brightness / 100.0) * 0.4 + (clip.exposure / 100.0) * 0.35
+            c_val = 1.0 + (clip.contrast / 100.0) * 0.5
+            s_val = max(0.0, 1.0 + (clip.saturation / 100.0))
+
+            if clip.highlights != 0 or clip.shadows != 0:
+                gamma_val = max(0.2, min(2.5, 1.0 - (clip.shadows / 100.0) * 0.35 + (clip.highlights / 100.0) * 0.35))
+                v_filters.append(f"eq=brightness={b_val:.3f}:contrast={c_val:.3f}:saturation={s_val:.3f}:gamma={gamma_val:.3f}")
+            elif clip.brightness != 0 or clip.contrast != 0 or clip.saturation != 0 or clip.exposure != 0:
                 v_filters.append(f"eq=brightness={b_val:.3f}:contrast={c_val:.3f}:saturation={s_val:.3f}")
+
+            # Temperature and Tint
+            if clip.temperature != 0 or clip.tint != 0:
+                t_r = (clip.temperature / 100.0) * 0.15
+                t_b = -(clip.temperature / 100.0) * 0.15
+                tint_g = -(clip.tint / 100.0) * 0.15
+                tint_rb = (clip.tint / 100.0) * 0.08
+                v_filters.append(f"colorbalance=rs={(t_r + tint_rb):.3f}:gs={tint_g:.3f}:bs={(t_b + tint_rb):.3f}")
+
+            # Vignette
+            if clip.vignette > 0:
+                v_filters.append(f"vignette=PI/4*{min(2.0, clip.vignette / 50.0):.2f}")
+
+            # Grain / Noise
+            if clip.grain > 0:
+                grain_str = max(1, int(clip.grain * 0.35))
+                v_filters.append(f"noise=alls={grain_str}:allf=t+u")
 
             if clip.opacity < 1.0 and clip.opacity >= 0:
                 v_filters.append(f"format=rgba,colorchannelmixer=aa={clip.opacity:.2f}")
@@ -263,8 +319,15 @@ def build_ffmpeg_command(
             f"between(t,{overlay.timeline_start:.3f},{overlay.timeline_start + overlay.duration:.3f})"
         )
 
+        ov_filters = [f"scale=iw*{overlay.scale:.2f}:-1"]
+        if overlay.rotation != 0:
+            ov_filters.append(f"rotate={overlay.rotation}*PI/180:c=none:ow='hypot(iw,ih)':oh=ow")
+        if overlay.opacity < 1.0 and overlay.opacity >= 0:
+            ov_filters.append(f"colorchannelmixer=aa={overlay.opacity:.2f}")
+        ov_filters.append("format=rgba")
+
         filter_chains.append(
-            f"[{in_idx}:v]scale=iw*{overlay.scale:.2f}:-1,format=rgba[{ov_scaled_tag}]"
+            f"[{in_idx}:v]{','.join(ov_filters)}[{ov_scaled_tag}]"
         )
         filter_chains.append(
             f"{last_v_tag}[{ov_scaled_tag}]overlay=x='{pos_x}':y='{pos_y}':enable='{enable_expr}'{next_v_tag}"
@@ -275,20 +338,55 @@ def build_ffmpeg_command(
     for t_idx, text_item in enumerate(manifest.text_layers):
         next_v_tag = f"[v_txt_{t_idx}]"
         clean_text = escape_drawtext(text_item.text)
-        enable_expr = (
-            f"between(t,{text_item.timeline_start:.3f},{text_item.timeline_start + text_item.duration:.3f})"
-        )
-        x_expr = f"(w*{text_item.position_x / 100.0:.3f})-(text_w/2)"
-        y_expr = f"(h*{text_item.position_y / 100.0:.3f})-(text_h/2)"
+        st = text_item.timeline_start
+        et = text_item.timeline_start + text_item.duration
+        dur = max(0.1, text_item.duration)
+
+        base_x = f"(w*{text_item.position_x / 100.0:.3f})-(text_w/2)"
+        base_y = f"(h*{text_item.position_y / 100.0:.3f})-(text_h/2)"
 
         drawtext_parts = [
             f"text='{clean_text}'",
             f"fontsize={text_item.font_size}",
             f"fontcolor={text_item.font_color}",
-            f"x='{x_expr}'",
-            f"y='{y_expr}'",
-            f"enable='{enable_expr}'",
         ]
+
+        if text_item.stroke_width > 0 and text_item.stroke_color:
+            drawtext_parts.append(f"borderw={text_item.stroke_width}")
+            drawtext_parts.append(f"bordercolor={text_item.stroke_color}")
+
+        if text_item.shadow_color:
+            drawtext_parts.append(f"shadowcolor={text_item.shadow_color}")
+            drawtext_parts.append("shadowx=2:shadowy=2")
+
+        if text_item.animation == "slide_bottom":
+            y_anim = f"if(lt(t-{st:.3f},0.4),({base_y})+(1-(t-{st:.3f})/0.4)*60,{base_y})"
+            drawtext_parts.extend([f"x='{base_x}'", f"y='{y_anim}'"])
+        elif text_item.animation == "slide_top":
+            y_anim = f"if(lt(t-{st:.3f},0.4),({base_y})-(1-(t-{st:.3f})/0.4)*60,{base_y})"
+            drawtext_parts.extend([f"x='{base_x}'", f"y='{y_anim}'"])
+        elif text_item.animation == "slide_left":
+            x_anim = f"if(lt(t-{st:.3f},0.4),({base_x})-(1-(t-{st:.3f})/0.4)*100,{base_x})"
+            drawtext_parts.extend([f"x='{x_anim}'", f"y='{base_y}'"])
+        elif text_item.animation == "slide_right":
+            x_anim = f"if(lt(t-{st:.3f},0.4),({base_x})+(1-(t-{st:.3f})/0.4)*100,{base_x})"
+            drawtext_parts.extend([f"x='{x_anim}'", f"y='{base_y}'"])
+        else:
+            drawtext_parts.extend([f"x='{base_x}'", f"y='{base_y}'"])
+
+        if text_item.animation == "fade":
+            fade_dur = min(0.4, dur / 3.0)
+            drawtext_parts.append(
+                f"alpha='if(lt(t-{st:.3f},{fade_dur:.2f}),(t-{st:.3f})/{fade_dur:.2f},if(gt(t,{et:.3f}-{fade_dur:.2f}),({et:.3f}-t)/{fade_dur:.2f},1))'"
+            )
+        elif text_item.animation == "scale_up":
+            pop_dur = min(0.3, dur / 3.0)
+            drawtext_parts.append(
+                f"alpha='if(lt(t-{st:.3f},{pop_dur:.2f}),(t-{st:.3f})/{pop_dur:.2f},1)'"
+            )
+
+        drawtext_parts.append(f"enable='between(t,{st:.3f},{et:.3f})'")
+
         system_font = find_system_font()
         if system_font:
             drawtext_parts.append(f"fontfile='{system_font}'")
@@ -300,15 +398,21 @@ def build_ffmpeg_command(
         )
         last_v_tag = next_v_tag
 
-    # Apply Background Audio Tracks
-    if manifest.audio_tracks:
+    # Apply Background Audio Tracks (skipping muted tracks)
+    valid_tracks = [t for t in manifest.audio_tracks if not t.is_muted and t.volume > 0]
+    if valid_tracks:
         audio_mix_inputs = [last_a_tag]
-        for a_idx, track in enumerate(manifest.audio_tracks):
+        for a_idx, track in enumerate(valid_tracks):
             in_idx = asset_to_input_idx.get(track.asset_id, 0)
             track_tag = f"[bg_a_{a_idx}]"
             a_filters: list[str] = [
                 f"atrim=start={track.start_trim:.3f}:end={track.start_trim + track.duration:.3f},asetpts=PTS-STARTPTS"
             ]
+
+            # Voice effects and noise reduction
+            vn_filters = build_voice_and_noise_filters(track.voice_effect, track.noise_reduction)
+            a_filters.extend(vn_filters)
+
             if track.volume != 1.0:
                 a_filters.append(f"volume={track.volume:.3f}")
             if track.fade_in_duration > 0:

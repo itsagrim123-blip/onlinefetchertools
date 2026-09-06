@@ -277,3 +277,84 @@ def test_api_project_render_endpoint(tmp_path):
     assert "content-disposition" in response.headers
     assert "x-filename" in response.headers
     assert len(response.content) > 0
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="FFmpeg required")
+def test_advanced_features_render(tmp_path):
+    vid = tmp_path / "clip.mp4"
+    aud = tmp_path / "voice.mp3"
+    make_synthetic_video(vid, duration=2)
+    make_synthetic_audio(aud, duration=2)
+
+    manifest = VideoProjectManifest(
+        title="Advanced Pro Video Project",
+        settings=ProjectSettingsModel(aspect_ratio="16:9"),
+        clips=[
+            VideoClipModel(
+                id="c1",
+                asset_id="a1",
+                name="clip.mp4",
+                source_duration=2.0,
+                start_trim=0.0,
+                end_trim=1.8,
+                speed=1.2,
+                offset_x=5.0,
+                offset_y=-3.0,
+                filter_preset="cinematic",
+                brightness=5,
+                contrast=10,
+                saturation=5,
+                exposure=10.0,
+                temperature=15.0,
+                tint=-5.0,
+                highlights=10.0,
+                shadows=-10.0,
+                vignette=20.0,
+                grain=15.0,
+            )
+        ],
+        audio_tracks=[
+            AudioTrackModel(
+                id="aud1",
+                asset_id="a2",
+                name="voice.mp3",
+                source_duration=2.0,
+                timeline_start=0.0,
+                start_trim=0.0,
+                duration=1.5,
+                volume=0.9,
+                voice_effect="deep",
+                noise_reduction=True,
+            )
+        ],
+        text_layers=[
+            TextLayerModel(
+                id="t1",
+                text="Cinematic Titles",
+                timeline_start=0.2,
+                duration=1.4,
+                font_size=28,
+                font_color="#facc15",
+                stroke_color="#000000",
+                stroke_width=2,
+                shadow_color="#333333",
+                animation="slide_bottom",
+                position_x=50,
+                position_y=75,
+            )
+        ],
+        export_settings=ExportSettingsModel(
+            format="mp4",
+            resolution="480p",
+            quality="medium",
+            fps=25,
+        ),
+    )
+
+    out_file = tmp_path / "advanced_output.mp4"
+    execute_project_render(manifest, {"a1": vid, "a2": aud}, out_file)
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+    meta = validate_media_file(out_file, expect_video=True, expect_audio=True)
+    assert meta["has_video"] is True
+    assert meta["has_audio"] is True

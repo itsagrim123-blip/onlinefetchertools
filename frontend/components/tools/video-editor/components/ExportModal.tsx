@@ -26,9 +26,10 @@ export function ExportModal({
   onExport,
 }: ExportModalProps) {
   const [format, setFormat] = useState<"mp4" | "webm" | "mov">("mp4");
-  const [resolution, setResolution] = useState<"original" | "1080p" | "720p" | "480p">("1080p");
+  const [resolution, setResolution] = useState<"original" | "1440p" | "1080p" | "720p" | "480p">("1080p");
   const [quality, setQuality] = useState<"high" | "medium" | "low">("high");
   const [fps, setFps] = useState<number>(30);
+  const [codec, setCodec] = useState<"h264" | "h265" | "vp9">("h264");
 
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function ExportModal({
         resolution,
         quality,
         fps,
+        codec,
       });
       if (res) {
         setResult(res);
@@ -149,8 +151,8 @@ export function ExportModal({
             {/* Resolution Picker */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-300">Resolution</label>
-              <div className="grid grid-cols-4 gap-2">
-                {(["original", "1080p", "720p", "480p"] as const).map((res) => (
+              <div className="grid grid-cols-5 gap-1.5">
+                {(["original", "1440p", "1080p", "720p", "480p"] as const).map((res) => (
                   <button
                     key={res}
                     type="button"
@@ -158,11 +160,37 @@ export function ExportModal({
                     onClick={() => setResolution(res)}
                     className={`h-9 rounded-xl border text-xs font-semibold transition ${
                       resolution === res
-                        ? "border-cyan-400 bg-cyan-400 text-slate-950"
+                        ? "border-cyan-400 bg-cyan-400 text-slate-950 shadow-md shadow-cyan-950/30"
                         : "border-white/10 bg-slate-900 text-slate-400 hover:text-white"
                     }`}
                   >
                     {res}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Video Codec */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-300">Video Codec</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "h264" as const, label: "H.264 (Universal)" },
+                  { id: "h265" as const, label: "H.265 (High Efficiency)" },
+                  { id: "vp9" as const, label: "VP9 (Web Optimized)" },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={isExporting}
+                    onClick={() => setCodec(c.id)}
+                    className={`h-9 rounded-xl border text-[11px] font-semibold transition ${
+                      codec === c.id
+                        ? "border-cyan-400 bg-cyan-400 text-slate-950 font-bold"
+                        : "border-white/10 bg-slate-900 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {c.label}
                   </button>
                 ))}
               </div>

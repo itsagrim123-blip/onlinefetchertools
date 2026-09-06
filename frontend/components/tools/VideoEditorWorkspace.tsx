@@ -87,12 +87,17 @@ export function VideoEditorWorkspace() {
     addAudioTrack,
     updateAudioTrack,
     removeAudioTrack,
+    duplicateAudioTrack,
+    extractAudioFromClip,
     addTextLayer,
     updateTextLayer,
     removeTextLayer,
+    duplicateTextLayer,
+    addAutoCaptions,
     addOverlayLayer,
     updateOverlayLayer,
     removeOverlayLayer,
+    duplicateOverlayLayer,
     setAspectRatio,
     setProjectTitle,
   } = useProjectState();
@@ -143,7 +148,10 @@ export function VideoEditorWorkspace() {
 
   const handleDuplicateSelected = useCallback(() => {
     if (selectedClipId) duplicateClip(selectedClipId);
-  }, [selectedClipId, duplicateClip]);
+    else if (selectedAudioId) duplicateAudioTrack(selectedAudioId);
+    else if (selectedTextId) duplicateTextLayer(selectedTextId);
+    else if (selectedOverlayId) duplicateOverlayLayer(selectedOverlayId);
+  }, [selectedClipId, selectedAudioId, selectedTextId, selectedOverlayId, duplicateClip, duplicateAudioTrack, duplicateTextLayer, duplicateOverlayLayer]);
 
   const handleReverseSelected = useCallback(() => {
     if (selectedClip) {
@@ -252,6 +260,14 @@ export function VideoEditorWorkspace() {
         brightness: c.brightness,
         contrast: c.contrast,
         saturation: c.saturation,
+        exposure: c.exposure || 0,
+        temperature: c.temperature || 0,
+        tint: c.tint || 0,
+        highlights: c.highlights || 0,
+        shadows: c.shadows || 0,
+        vignette: c.vignette || 0,
+        grain: c.grain || 0,
+        filter_intensity: c.filterIntensity ?? 100,
         transition: c.transition
           ? {
               type: c.transition.type,
@@ -271,6 +287,8 @@ export function VideoEditorWorkspace() {
         is_muted: a.isMuted,
         fade_in_duration: a.fadeInDuration,
         fade_out_duration: a.fadeOutDuration,
+        voice_effect: a.voiceEffect || "none",
+        noise_reduction: Boolean(a.noiseReduction),
       })),
       text_layers: project.textLayers.map((t) => ({
         id: t.id,
@@ -279,7 +297,12 @@ export function VideoEditorWorkspace() {
         duration: t.duration,
         font_size: t.fontSize,
         font_color: t.fontColor,
+        font_family: t.fontFamily || "Arial",
         background_color: t.backgroundColor,
+        stroke_color: t.strokeColor || null,
+        stroke_width: t.strokeWidth || 0,
+        shadow_color: t.shadowColor || null,
+        shadow_blur: t.shadowBlur || 0,
         alignment: t.alignment,
         is_bold: t.isBold,
         is_italic: t.isItalic,
@@ -298,6 +321,7 @@ export function VideoEditorWorkspace() {
         position_x: o.positionX,
         position_y: o.positionY,
         rotation: o.rotation,
+        blend_mode: o.blendMode || "normal",
       })),
       export_settings: {
         format: settings.format,
@@ -527,6 +551,7 @@ export function VideoEditorWorkspace() {
               onAddAudioToTimeline={handleAddAudioAtCurrent}
               onAddOverlayToTimeline={handleAddOverlayAtCurrent}
               onAddTextLayer={handleAddTextAtCurrent}
+              onAddAutoCaptions={addAutoCaptions}
               onApplyFilterPreset={handleApplyFilterPreset}
               selectedClipFilterPreset={selectedClip?.filterPreset}
               onApplyTransition={handleApplyDrawerTransition}
@@ -576,6 +601,8 @@ export function VideoEditorWorkspace() {
               onDeleteSelected={handleDeleteSelected}
               onReverseClip={handleReverseSelected}
               onFreezeFrame={handleFreezeFrameSelected}
+              onExtractAudio={extractAudioFromClip}
+              onDuplicateSelected={handleDuplicateSelected}
             />
           </div>
 
@@ -828,6 +855,10 @@ export function VideoEditorWorkspace() {
                   handleAddTextAtCurrent(time, text);
                   handleCloseMobileSheet();
                 }}
+                onAddAutoCaptions={(segments) => {
+                  addAutoCaptions(segments);
+                  handleCloseMobileSheet();
+                }}
                 onApplyFilterPreset={() => {}}
                 onApplyTransition={() => {}}
                 onSetAspectRatio={handleAspectRatioChange}
@@ -899,6 +930,8 @@ export function VideoEditorWorkspace() {
                 onDeleteSelected={handleMobileDeleteSelected}
                 onReverseClip={handleReverseSelected}
                 onFreezeFrame={handleFreezeFrameSelected}
+                onExtractAudio={extractAudioFromClip}
+                onDuplicateSelected={handleDuplicateSelected}
               />
             )}
 

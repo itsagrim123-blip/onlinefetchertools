@@ -20,7 +20,6 @@ router = APIRouter(prefix="/api/media", tags=["Media tools"])
 
 
 @router.post("/convert")
-@router.post("/extract-audio")
 async def convert(file: UploadFile = File(...), output_format: str = Form("mp4")):
     work_dir = create_work_dir()
     try:
@@ -32,6 +31,25 @@ async def convert(file: UploadFile = File(...), output_format: str = Form("mp4")
         async with MEDIA_SEMAPHORE:
             await asyncio.to_thread(convert_media, source, output, target_format)
         return download_response(output, filename=output.name, work_dir=work_dir)
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
+
+@router.post("/extract-audio")
+async def extract_audio_route(file: UploadFile = File(...), output_format: str = Form("mp3")):
+    work_dir = create_work_dir()
+    try:
+        source = work_dir / safe_upload_name(file.filename, "video")
+        await save_upload(file, source, VIDEO_EXTENSIONS)
+        stem = Path(safe_upload_name(file.filename, "video")).stem
+        target_format = output_format.lower().lstrip(".")
+        if target_format not in {"mp3", "wav", "aac", "m4a", "ogg"}:
+            target_format = "mp3"
+        output = work_dir / f"{stem}_extracted.{target_format}"
+        async with MEDIA_SEMAPHORE:
+            await asyncio.to_thread(convert_media, source, output, target_format)
+        return download_response(output, filename=output.name, media_type=f"audio/{target_format}", work_dir=work_dir)
     except Exception:
         cleanup_work_dir(work_dir)
         raise

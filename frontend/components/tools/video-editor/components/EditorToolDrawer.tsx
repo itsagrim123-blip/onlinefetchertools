@@ -18,6 +18,7 @@ import {
   Shuffle,
   Settings as SettingsIcon,
   Check,
+  Loader2,
 } from "lucide-react";
 import {
   AspectRatioPreset,
@@ -53,6 +54,7 @@ interface EditorToolDrawerProps {
   onApplyTransition: (type: TransitionType) => void;
   onSetAspectRatio: (ratio: AspectRatioPreset) => void;
   onUpdateTitle: (title: string) => void;
+  onAddAutoCaptions?: (segments: { start: number; duration: number; text: string }[]) => void;
 }
 
 export const EditorToolDrawer = memo(function EditorToolDrawer({
@@ -70,10 +72,64 @@ export const EditorToolDrawer = memo(function EditorToolDrawer({
   onApplyTransition,
   onSetAspectRatio,
   onUpdateTitle,
+  onAddAutoCaptions,
 }: EditorToolDrawerProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [mediaFilter, setMediaFilter] = useState<"all" | MediaType>("all");
   const [activeKebabId, setActiveKebabId] = useState<string | null>(null);
+  const [isGeneratingCaptions, setIsGeneratingCaptions] = useState<boolean>(false);
+  const [captionsError, setCaptionsError] = useState<string | null>(null);
+
+  const handleGenerateAutoCaptions = async () => {
+    const videoAsset = project.assets.find((a) => a.type === "video");
+    if (!videoAsset) {
+      setCaptionsError("Please upload or add a video first.");
+      return;
+    }
+    setIsGeneratingCaptions(true);
+    setCaptionsError(null);
+    try {
+      let fileToUpload = videoAsset.file;
+      if (!fileToUpload) {
+        const resp = await fetch(videoAsset.objectUrl);
+        const blob = await resp.blob();
+        fileToUpload = new File([blob], videoAsset.name || "video.mp4", { type: blob.type || "video/mp4" });
+      }
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("language", "auto");
+      const res = await fetch("/api/media/auto-captions/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        throw new Error(`Auto captions failed (${res.status})`);
+      }
+      const data = await res.json();
+      if (data && Array.isArray(data.segments) && data.segments.length > 0) {
+        const parsed = data.segments
+          .map((seg: { start?: number; end?: number; text?: string }) => ({
+            start: seg.start || 0,
+            duration: Math.max(0.8, (seg.end || (seg.start || 0) + 2.0) - (seg.start || 0)),
+            text: (seg.text || "").trim(),
+          }))
+          .filter((s: { text: string }) => s.text.length > 0);
+
+        if (onAddAutoCaptions) {
+          onAddAutoCaptions(parsed);
+        } else {
+          parsed.forEach((s: { start: number; text: string }) => onAddTextLayer(s.start, s.text));
+        }
+      } else {
+        setCaptionsError("No spoken words detected in the video.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate AI captions.";
+      setCaptionsError(msg);
+    } finally {
+      setIsGeneratingCaptions(false);
+    }
+  };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -398,19 +454,22 @@ export const EditorToolDrawer = memo(function EditorToolDrawer({
       {activeTab === "filters" && (
         <div className="flex flex-col h-full p-3.5 space-y-3">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
-            <h2 className="text-sm font-bold text-white tracking-wide">Filters</h2>
+            <h2 className="text-sm font-bold text-white tracking-wide">Filters & Looks</h2>
           </div>
           <p className="text-[11px] text-slate-400">Select a clip on the timeline to apply visual color filters.</p>
           <div className="grid grid-cols-2 gap-2 overflow-y-auto">
             {[
               { id: "original", label: "Original", color: "from-slate-700 to-slate-800" },
-              { id: "warm", label: "Warm", color: "from-amber-600 to-orange-800" },
-              { id: "cool", label: "Cool", color: "from-cyan-600 to-blue-800" },
-              { id: "vintage", label: "Vintage", color: "from-yellow-700 to-amber-900" },
-              { id: "bw", label: "B&W", color: "from-slate-400 to-slate-900" },
-              { id: "fade", label: "Fade", color: "from-stone-500 to-zinc-800" },
-              { id: "bright", label: "Bright", color: "from-sky-400 to-indigo-600" },
-              { id: "contrast", label: "Contrast", color: "from-violet-700 to-slate-950" },
+              { id: "cinematic", label: "Cinematic", color: "from-teal-700 to-amber-900" },
+              { id: "warm", label: "Warm Sunset", color: "from-amber-600 to-orange-800" },
+              { id: "cool", label: "Cool Nordic", color: "from-cyan-600 to-blue-800" },
+              { id: "retro", label: "Retro 90s", color: "from-yellow-700 to-amber-900" },
+              { id: "film", label: "Film Grain", color: "from-stone-700 to-amber-950" },
+              { id: "soft", label: "Dreamy Soft", color: "from-rose-600 to-purple-800" },
+              { id: "bw", label: "B&W Noir", color: "from-slate-400 to-slate-900" },
+              { id: "fade", label: "Faded Mood", color: "from-stone-500 to-zinc-800" },
+              { id: "bright", label: "Bright Pop", color: "from-sky-400 to-indigo-600" },
+              { id: "contrast", label: "High Drama", color: "from-violet-700 to-slate-950" },
             ].map((f) => (
               <button
                 key={f.id}
@@ -437,13 +496,13 @@ export const EditorToolDrawer = memo(function EditorToolDrawer({
           </div>
           <p className="text-[11px] text-slate-400">Stylistic enhancements applied to current clip.</p>
           <div className="space-y-2">
-            {["Blur", "Vignette", "Sharpen", "Grayscale"].map((eff) => (
+            {["Vignette", "Film Grain", "Exposure Boost", "Temperature Shift"].map((eff) => (
               <div
                 key={eff}
                 className="p-3 rounded-xl border border-white/10 bg-slate-900/60 flex items-center justify-between text-xs"
               >
                 <span className="font-semibold text-white">{eff}</span>
-                <span className="text-[10px] text-slate-500">Preset Ready</span>
+                <span className="text-[10px] text-cyan-400 font-mono">Adjust Tab</span>
               </div>
             ))}
           </div>
@@ -457,10 +516,13 @@ export const EditorToolDrawer = memo(function EditorToolDrawer({
             <h2 className="text-sm font-bold text-white tracking-wide">Transitions</h2>
           </div>
           <p className="text-[11px] text-slate-400">Apply transition to next clip on the timeline.</p>
-          <div className="space-y-2">
+          <div className="space-y-2 overflow-y-auto">
             {[
               { id: "none" as const, label: "Cut (None)", desc: "Instant clip switch" },
               { id: "fade" as const, label: "Dissolve / Fade", desc: "Smooth crossfade blend" },
+              { id: "dissolve" as const, label: "Cross Dissolve", desc: "Classic video cross dissolve" },
+              { id: "crossfade" as const, label: "Cinematic Crossfade", desc: "Audio & video crossfade blend" },
+              { id: "blur" as const, label: "Blur Transition", desc: "Defocus & focus zoom" },
               { id: "slide_left" as const, label: "Slide Left", desc: "Next clip enters from right" },
               { id: "slide_right" as const, label: "Slide Right", desc: "Next clip enters from left" },
               { id: "zoom" as const, label: "Zoom Cross", desc: "Dynamic zoom transition" },
@@ -483,16 +545,53 @@ export const EditorToolDrawer = memo(function EditorToolDrawer({
       {activeTab === "captions" && (
         <div className="flex flex-col h-full p-3.5 space-y-3">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
-            <h2 className="text-sm font-bold text-white tracking-wide">Captions</h2>
+            <h2 className="text-sm font-bold text-white tracking-wide">Auto Captions & Subtitles</h2>
           </div>
-          <button
-            type="button"
-            onClick={() => onAddTextLayer(currentTime, "Enter subtitle here...")}
-            className="flex items-center justify-center gap-1.5 h-9 w-full rounded-xl bg-cyan-400 text-xs font-bold text-slate-950 hover:bg-cyan-300"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add Caption at Playhead
-          </button>
-          <p className="text-[11px] text-slate-400">Manual timed subtitle blocks placed along your video timeline.</p>
+
+          {/* AI Auto-Transcribe Button */}
+          <div className="p-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.05] space-y-2">
+            <div className="flex items-center gap-2 text-cyan-300">
+              <Wand2 className="h-4 w-4" />
+              <h3 className="text-xs font-bold">AI Auto Captions</h3>
+            </div>
+            <p className="text-[11px] text-slate-300">
+              Automatically extract speech from your video and create timed subtitle blocks on the timeline.
+            </p>
+            <button
+              type="button"
+              disabled={isGeneratingCaptions}
+              onClick={handleGenerateAutoCaptions}
+              className="flex items-center justify-center gap-2 h-9 w-full rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 text-xs font-bold text-slate-950 hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50"
+            >
+              {isGeneratingCaptions ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Transcribing Speech...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" /> Auto-Generate Subtitles
+                </>
+              )}
+            </button>
+          </div>
+
+          {captionsError && (
+            <p className="p-2.5 rounded-xl border border-red-400/30 bg-red-400/10 text-xs text-red-300">
+              {captionsError}
+            </p>
+          )}
+
+          <div className="pt-2 border-t border-white/10 space-y-2">
+            <h4 className="text-xs font-semibold text-slate-300">Manual Subtitles</h4>
+            <button
+              type="button"
+              onClick={() => onAddTextLayer(currentTime, "Enter subtitle here...")}
+              className="flex items-center justify-center gap-1.5 h-9 w-full rounded-xl border border-white/10 bg-slate-900 text-xs font-semibold text-slate-200 hover:bg-white/5 transition"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Manual Caption at Playhead
+            </button>
+            <p className="text-[10px] text-slate-500">Add customizable text layers directly at the current playhead position.</p>
+          </div>
         </div>
       )}
 

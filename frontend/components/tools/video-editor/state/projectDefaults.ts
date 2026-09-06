@@ -36,6 +36,14 @@ export function createDefaultClip(asset: MediaAsset): VideoClip {
     brightness: 0,
     contrast: 0,
     saturation: 0,
+    exposure: 0,
+    temperature: 0,
+    tint: 0,
+    highlights: 0,
+    shadows: 0,
+    vignette: 0,
+    grain: 0,
+    filterIntensity: 100,
   };
 }
 
@@ -53,6 +61,8 @@ export function createDefaultAudioTrack(asset: MediaAsset, timelineStart: number
     isMuted: false,
     fadeInDuration: 0,
     fadeOutDuration: 0,
+    voiceEffect: "none",
+    noiseReduction: false,
   };
 }
 
@@ -64,7 +74,12 @@ export function createDefaultTextLayer(timelineStart: number = 0, duration: numb
     duration: Math.max(1.0, duration),
     fontSize: 28,
     fontColor: "#ffffff",
+    fontFamily: "Arial",
     backgroundColor: "rgba(0,0,0,0.4)",
+    strokeColor: "#000000",
+    strokeWidth: 0,
+    shadowColor: "rgba(0,0,0,0.5)",
+    shadowBlur: 4,
     alignment: "center",
     isBold: false,
     isItalic: false,
@@ -87,6 +102,7 @@ export function createDefaultOverlay(asset: MediaAsset, timelineStart: number = 
     positionX: 75,
     positionY: 25,
     rotation: 0,
+    blendMode: "normal",
   };
 }
 

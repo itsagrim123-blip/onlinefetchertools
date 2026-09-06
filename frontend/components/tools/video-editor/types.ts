@@ -16,7 +16,15 @@ export interface MediaAsset {
 
 export type AspectRatioPreset = "16:9" | "9:16" | "1:1" | "4:5" | "original";
 
-export type TransitionType = "none" | "fade" | "slide_left" | "slide_right" | "zoom";
+export type TransitionType =
+  | "none"
+  | "fade"
+  | "dissolve"
+  | "crossfade"
+  | "blur"
+  | "slide_left"
+  | "slide_right"
+  | "zoom";
 
 export interface ClipTransition {
   type: TransitionType;
@@ -40,7 +48,7 @@ export interface VideoClip {
 
   // Transforms
   scale: number;        // 0.5 to 3.0 (default 1.0)
-  rotation: number;     // 0, 90, 180, 270
+  rotation: number;     // 0 - 360 degrees
   flipHorizontal: boolean;
   flipVertical: boolean;
   offsetX: number;      // percentage offset (-50 to 50)
@@ -57,6 +65,12 @@ export interface VideoClip {
   saturation: number;   // -100 to 100 (default 0)
   exposure?: number;    // -100 to 100
   temperature?: number; // -100 to 100
+  tint?: number;        // -100 to 100
+  highlights?: number;  // -100 to 100
+  shadows?: number;     // -100 to 100
+  vignette?: number;    // 0 to 100
+  grain?: number;       // 0 to 100
+  filterIntensity?: number; // 0 to 100
 
   // Transition to next clip
   transition?: ClipTransition;
@@ -70,7 +84,11 @@ export type FilterPreset =
   | "bw"
   | "fade"
   | "bright"
-  | "contrast";
+  | "contrast"
+  | "cinematic"
+  | "retro"
+  | "film"
+  | "soft";
 
 export interface AudioTrackItem {
   id: string;
@@ -84,9 +102,18 @@ export interface AudioTrackItem {
   isMuted: boolean;
   fadeInDuration: number;
   fadeOutDuration: number;
+  voiceEffect?: "none" | "deep" | "high" | "robot" | "echo" | "radio";
+  noiseReduction?: boolean;
 }
 
-export type TextAnimationType = "none" | "fade" | "slide_bottom" | "scale_up";
+export type TextAnimationType =
+  | "none"
+  | "fade"
+  | "slide_bottom"
+  | "slide_top"
+  | "slide_left"
+  | "slide_right"
+  | "scale_up";
 
 export interface TextLayerItem {
   id: string;
@@ -95,7 +122,12 @@ export interface TextLayerItem {
   duration: number;
   fontSize: number;       // in pt / px
   fontColor: string;      // hex e.g. #ffffff
+  fontFamily?: string;    // font-family name
   backgroundColor?: string; // hex or rgba
+  strokeColor?: string;   // text outline stroke
+  strokeWidth?: number;   // stroke width in px
+  shadowColor?: string;   // text drop shadow
+  shadowBlur?: number;    // blur radius
   alignment: "left" | "center" | "right";
   isBold: boolean;
   isItalic: boolean;
@@ -115,6 +147,7 @@ export interface OverlayLayerItem {
   positionX: number;      // % 0 - 100
   positionY: number;      // % 0 - 100
   rotation: number;       // 0 - 360
+  blendMode?: "normal" | "multiply" | "screen" | "overlay" | "darken" | "lighten";
 }
 
 export interface TrackControls {
@@ -145,9 +178,11 @@ export interface VideoProject {
 
 export interface ExportSettings {
   format: "mp4" | "webm" | "mov";
-  resolution: "original" | "1080p" | "720p" | "480p";
+  resolution: "original" | "1440p" | "1080p" | "720p" | "480p";
   quality: "high" | "medium" | "low";
   fps: number;
+  codec?: "h264" | "h265" | "vp9";
+  bitrate?: "auto" | "high" | "medium";
 }
 
 export type SidebarTab =

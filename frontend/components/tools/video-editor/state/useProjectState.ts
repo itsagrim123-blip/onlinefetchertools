@@ -496,6 +496,74 @@ export function useProjectState(initial?: VideoProject) {
     [selectedAudioId, updateProjectWithHistory]
   );
 
+  const duplicateAudioTrack = useCallback(
+    (trackId: string) => {
+      updateProjectWithHistory((prev) => {
+        const orig = prev.audioTracks.find((t) => t.id === trackId);
+        if (!orig) return prev;
+        const copy: AudioTrackItem = {
+          ...orig,
+          id: `audio_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          name: `${orig.name} (Copy)`,
+          timelineStart: orig.timelineStart + 1.0,
+        };
+        setSelectedAudioId(copy.id);
+        return {
+          ...prev,
+          audioTracks: [...prev.audioTracks, copy],
+        };
+      });
+    },
+    [updateProjectWithHistory]
+  );
+
+  // Extract audio from video clip into an independent audio track
+  const extractAudioFromClip = useCallback(
+    (clipId: string) => {
+      updateProjectWithHistory((prev) => {
+        const ranges = computeClipTimeRanges(prev.clips);
+        const targetRange = ranges.find((r) => r.clip.id === clipId);
+        if (!targetRange || targetRange.clip.type !== "video") return prev;
+
+        const clip = targetRange.clip;
+        const asset = prev.assets.find((a) => a.id === clip.assetId);
+        if (!asset) return prev;
+
+        const effectiveDur = Math.max(0.1, (clip.endTrim - clip.startTrim) / Math.max(0.1, clip.speed || 1.0));
+
+        const extractedAudio: AudioTrackItem = {
+          id: `audio_extracted_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          assetId: clip.assetId,
+          name: `${clip.name} (Audio)`,
+          sourceDuration: clip.sourceDuration,
+          timelineStart: targetRange.startTime,
+          startTrim: clip.startTrim,
+          duration: effectiveDur,
+          volume: clip.volume,
+          isMuted: false,
+          fadeInDuration: clip.fadeInDuration,
+          fadeOutDuration: clip.fadeOutDuration,
+          voiceEffect: "none",
+          noiseReduction: false,
+        };
+
+        // Mute the original clip so audio isn't doubled
+        const updatedClips = prev.clips.map((c) => (c.id === clipId ? { ...c, isMuted: true } : c));
+
+        setSelectedAudioId(extractedAudio.id);
+        setSelectedClipId(null);
+        setSidebarTab("audio");
+
+        return {
+          ...prev,
+          clips: updatedClips,
+          audioTracks: [...prev.audioTracks, extractedAudio],
+        };
+      });
+    },
+    [updateProjectWithHistory]
+  );
+
   // --- Text Layer Operations ---
   const addTextLayer = useCallback(
     (timelineStart?: number, text: string = "Happy Birthday") => {
@@ -508,6 +576,26 @@ export function useProjectState(initial?: VideoProject) {
         return {
           ...prev,
           textLayers: [...prev.textLayers, newLayer],
+        };
+      });
+    },
+    [updateProjectWithHistory]
+  );
+
+  const duplicateTextLayer = useCallback(
+    (layerId: string) => {
+      updateProjectWithHistory((prev) => {
+        const orig = prev.textLayers.find((t) => t.id === layerId);
+        if (!orig) return prev;
+        const copy: TextLayerItem = {
+          ...orig,
+          id: `text_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          timelineStart: orig.timelineStart + 0.5,
+        };
+        setSelectedTextId(copy.id);
+        return {
+          ...prev,
+          textLayers: [...prev.textLayers, copy],
         };
       });
     },
@@ -535,6 +623,34 @@ export function useProjectState(initial?: VideoProject) {
     [selectedTextId, updateProjectWithHistory]
   );
 
+  const addAutoCaptions = useCallback(
+    (segments: { start: number; duration: number; text: string }[]) => {
+      if (!segments || segments.length === 0) return;
+      updateProjectWithHistory((prev) => {
+        const newLayers: TextLayerItem[] = segments.map((seg, idx) => {
+          const layer = createDefaultTextLayer(seg.start, Math.max(0.5, seg.duration));
+          layer.id = `caption_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+          layer.text = seg.text;
+          layer.fontSize = 24;
+          layer.positionY = 82; // Position captions near the bottom
+          layer.strokeColor = "#000000";
+          layer.strokeWidth = 2;
+          layer.shadowColor = "rgba(0,0,0,0.8)";
+          layer.shadowBlur = 4;
+          return layer;
+        });
+        if (newLayers.length > 0) {
+          setSelectedTextId(newLayers[0].id);
+        }
+        return {
+          ...prev,
+          textLayers: [...prev.textLayers, ...newLayers],
+        };
+      });
+    },
+    [updateProjectWithHistory]
+  );
+
   // --- Overlay Layer Operations ---
   const addOverlayLayer = useCallback(
     (assetId: string, timelineStart?: number) => {
@@ -548,6 +664,26 @@ export function useProjectState(initial?: VideoProject) {
         return {
           ...prev,
           overlayLayers: [...prev.overlayLayers, newOverlay],
+        };
+      });
+    },
+    [updateProjectWithHistory]
+  );
+
+  const duplicateOverlayLayer = useCallback(
+    (layerId: string) => {
+      updateProjectWithHistory((prev) => {
+        const orig = prev.overlayLayers.find((o) => o.id === layerId);
+        if (!orig) return prev;
+        const copy: OverlayLayerItem = {
+          ...orig,
+          id: `overlay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          timelineStart: orig.timelineStart + 0.5,
+        };
+        setSelectedOverlayId(copy.id);
+        return {
+          ...prev,
+          overlayLayers: [...prev.overlayLayers, copy],
         };
       });
     },
@@ -714,12 +850,17 @@ export function useProjectState(initial?: VideoProject) {
     addAudioTrack,
     updateAudioTrack,
     removeAudioTrack,
+    duplicateAudioTrack,
+    extractAudioFromClip,
     addTextLayer,
     updateTextLayer,
     removeTextLayer,
+    duplicateTextLayer,
+    addAutoCaptions,
     addOverlayLayer,
     updateOverlayLayer,
     removeOverlayLayer,
+    duplicateOverlayLayer,
     setAspectRatio,
     setProjectTitle,
   };

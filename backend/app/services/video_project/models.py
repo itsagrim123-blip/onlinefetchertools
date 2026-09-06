@@ -12,7 +12,7 @@ class ProjectSettingsModel(BaseModel):
 
 
 class ClipTransitionModel(BaseModel):
-    type: Literal["none", "fade", "slide_left", "slide_right", "zoom"] = "none"
+    type: Literal["none", "fade", "dissolve", "crossfade", "blur", "slide_left", "slide_right", "zoom"] = "none"
     duration: float = 0.5
 
 
@@ -46,6 +46,14 @@ class VideoClipModel(BaseModel):
     brightness: int = 0
     contrast: int = 0
     saturation: int = 0
+    exposure: float = 0.0
+    temperature: float = 0.0
+    tint: float = 0.0
+    highlights: float = 0.0
+    shadows: float = 0.0
+    vignette: float = 0.0
+    grain: float = 0.0
+    filter_intensity: float = 100.0
 
     # Transition to next clip
     transition: ClipTransitionModel | None = None
@@ -63,6 +71,8 @@ class AudioTrackModel(BaseModel):
     is_muted: bool = False
     fade_in_duration: float = 0.0
     fade_out_duration: float = 0.0
+    voice_effect: Literal["none", "deep", "high", "robot", "echo", "radio"] = "none"
+    noise_reduction: bool = False
 
 
 class TextLayerModel(BaseModel):
@@ -72,11 +82,16 @@ class TextLayerModel(BaseModel):
     duration: float = 3.0
     font_size: int = 28
     font_color: str = "#ffffff"
+    font_family: str = "Arial"
     background_color: str | None = None
     alignment: Literal["left", "center", "right"] = "center"
     is_bold: bool = False
     is_italic: bool = False
-    animation: Literal["none", "fade", "slide_bottom", "scale_up"] = "none"
+    stroke_color: str | None = None
+    stroke_width: int = 0
+    shadow_color: str | None = None
+    shadow_blur: int = 0
+    animation: Literal["none", "fade", "slide_bottom", "slide_top", "slide_left", "slide_right", "scale_up"] = "none"
     position_x: float = 50.0
     position_y: float = 82.0
 
@@ -92,11 +107,12 @@ class OverlayLayerModel(BaseModel):
     position_x: float = 75.0
     position_y: float = 25.0
     rotation: int = 0
+    blend_mode: Literal["normal", "multiply", "screen", "overlay", "darken", "lighten"] = "normal"
 
 
 class ExportSettingsModel(BaseModel):
     format: Literal["mp4", "webm", "mov"] = "mp4"
-    resolution: Literal["original", "1080p", "720p", "480p"] = "1080p"
+    resolution: Literal["original", "1440p", "1080p", "720p", "480p"] = "1080p"
     quality: Literal["high", "medium", "low"] = "high"
     fps: int = 30
 
