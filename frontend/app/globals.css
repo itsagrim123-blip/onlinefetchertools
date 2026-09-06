@@ -46,6 +46,71 @@ img {
   }
 }
 
+/* Custom sleek dark scrollbar matching UI theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #090d16;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #232d3d;
+  border-radius: 9999px;
+  border: 1px solid #090d16;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: #06b6d4;
+}
+
+/* Remove default white arrow buttons in Windows / Chromium */
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar-corner {
+  background: #090d16;
+}
+
+/* Specific utilities for scrollable containers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.sleek-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.sleek-scrollbar::-webkit-scrollbar-track {
+  background: #090d16;
+  border-radius: 9999px;
+}
+.sleek-scrollbar::-webkit-scrollbar-thumb {
+  background: #232d3d;
+  border-radius: 9999px;
+}
+.sleek-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #06b6d4;
+}
+
 /* Light theme styling */
 html.light,
 html[data-theme="light"] {

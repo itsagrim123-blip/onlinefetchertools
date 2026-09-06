@@ -21,6 +21,7 @@ import {
   VolumeX,
   Layers,
   Camera,
+  Move,
 } from "lucide-react";
 import {
   AspectRatioPreset,
@@ -321,6 +322,12 @@ export function RightPropertiesPanel({
 
         <p className="text-xs font-semibold text-white truncate">{selectedOverlay.name}</p>
 
+        {/* Drag Hint Banner */}
+        <div className="p-2.5 rounded-xl border border-amber-400/20 bg-amber-400/10 text-xs text-amber-200/90 flex items-start gap-2">
+          <Move className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+          <span>Click and drag this sticker directly on the video preview screen to place it anywhere!</span>
+        </div>
+
         {/* Scale */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-slate-300">
@@ -349,6 +356,109 @@ export function RightPropertiesPanel({
             max="100"
             value={Math.round(selectedOverlay.opacity * 100)}
             onChange={(e) => onUpdateOverlay({ opacity: parseFloat(e.target.value) / 100 })}
+            className="w-full accent-amber-400 cursor-pointer"
+          />
+        </div>
+
+        {/* Position Controls */}
+        <div className="space-y-2.5 pt-2 border-t border-white/10">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-slate-300 font-medium">Position Coordinates</label>
+            <span className="text-[11px] font-mono text-amber-300">
+              {Math.round(selectedOverlay.positionX)}%, {Math.round(selectedOverlay.positionY)}%
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px] text-slate-400">
+              <span>Horizontal (X)</span>
+              <span>{Math.round(selectedOverlay.positionX)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={Math.round(selectedOverlay.positionX)}
+              onChange={(e) => onUpdateOverlay({ positionX: parseFloat(e.target.value) })}
+              className="w-full accent-amber-400 cursor-pointer"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px] text-slate-400">
+              <span>Vertical (Y)</span>
+              <span>{Math.round(selectedOverlay.positionY)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={Math.round(selectedOverlay.positionY)}
+              onChange={(e) => onUpdateOverlay({ positionY: parseFloat(e.target.value) })}
+              className="w-full accent-amber-400 cursor-pointer"
+            />
+          </div>
+
+          {/* Quick Position Presets */}
+          <div className="grid grid-cols-3 gap-1 pt-1">
+            <button
+              type="button"
+              onClick={() => onUpdateOverlay({ positionX: 20, positionY: 20 })}
+              className="px-2 py-1 rounded bg-slate-900 border border-white/10 text-[10px] text-slate-300 hover:text-white hover:border-amber-400/40"
+            >
+              Top-Left
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateOverlay({ positionX: 50, positionY: 20 })}
+              className="px-2 py-1 rounded bg-slate-900 border border-white/10 text-[10px] text-slate-300 hover:text-white hover:border-amber-400/40"
+            >
+              Top-Center
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateOverlay({ positionX: 80, positionY: 20 })}
+              className="px-2 py-1 rounded bg-slate-900 border border-white/10 text-[10px] text-slate-300 hover:text-white hover:border-amber-400/40"
+            >
+              Top-Right
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateOverlay({ positionX: 20, positionY: 80 })}
+              className="px-2 py-1 rounded bg-slate-900 border border-white/10 text-[10px] text-slate-300 hover:text-white hover:border-amber-400/40"
+            >
+              Bottom-Left
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateOverlay({ positionX: 50, positionY: 50 })}
+              className="px-2 py-1 rounded bg-slate-900 border border-white/10 text-[10px] text-amber-300 font-semibold hover:border-amber-400/40"
+            >
+              Center
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateOverlay({ positionX: 80, positionY: 80 })}
+              className="px-2 py-1 rounded bg-slate-900 border border-white/10 text-[10px] text-slate-300 hover:text-white hover:border-amber-400/40"
+            >
+              Bottom-Right
+            </button>
+          </div>
+        </div>
+
+        {/* Rotation */}
+        <div className="space-y-1 pt-2 border-t border-white/10">
+          <div className="flex justify-between text-xs text-slate-300">
+            <span>Rotation</span>
+            <span className="text-amber-300 font-mono">{selectedOverlay.rotation}°</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="360"
+            step="5"
+            value={selectedOverlay.rotation}
+            onChange={(e) => onUpdateOverlay({ rotation: parseInt(e.target.value) })}
             className="w-full accent-amber-400 cursor-pointer"
           />
         </div>

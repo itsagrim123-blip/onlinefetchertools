@@ -428,7 +428,7 @@ export function Timeline({
         <div
           ref={scrollContainerRef}
           style={{ touchAction: "pan-x" }}
-          className="relative flex-1 overflow-x-auto overflow-y-hidden pb-1 select-none"
+          className="relative flex-1 overflow-x-auto overflow-y-hidden pb-1 select-none sleek-scrollbar"
         >
           <div
             style={{ width: `${timelineContentWidth}px` }}

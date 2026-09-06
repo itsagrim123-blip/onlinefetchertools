@@ -4,20 +4,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   Download,
-  FastForward,
   Maximize,
   Minimize,
+  Move,
   Pause,
   Play,
   RotateCcw,
   RotateCw,
-  Sparkles,
+  Trash2,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import {
   AspectRatioPreset,
   MediaAsset,
+  OverlayLayerItem,
+  TextLayerItem,
   VideoClip,
   VideoProject,
 } from "../types";
@@ -35,6 +37,13 @@ interface CanvasPreviewProps {
   onSeek: (time: number) => void;
   onUpdateSettings?: (settings: Partial<import("../types").ProjectSettings>) => void;
   onOpenSettings?: () => void;
+  selectedOverlayId?: string | null;
+  onSelectOverlay?: (id: string | null) => void;
+  onUpdateOverlay?: (id: string, partial: Partial<OverlayLayerItem>) => void;
+  onDeleteOverlay?: (id: string) => void;
+  selectedTextId?: string | null;
+  onSelectText?: (id: string | null) => void;
+  onUpdateText?: (id: string, partial: Partial<TextLayerItem>) => void;
 }
 
 export function CanvasPreview({
@@ -47,8 +56,16 @@ export function CanvasPreview({
   onSeek,
   onUpdateSettings,
   onOpenSettings,
+  selectedOverlayId,
+  onSelectOverlay,
+  onUpdateOverlay,
+  onDeleteOverlay,
+  selectedTextId,
+  onSelectText,
+  onUpdateText,
 }: CanvasPreviewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const bgAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -78,93 +95,164 @@ export function CanvasPreview({
     return project.assets.find((a) => a.id === activeAudioTrack.assetId);
   }, [activeAudioTrack, project.assets]);
 
-  // Sync background audio playback
-  useEffect(() => {
-    const audioEl = bgAudioRef.current;
-    if (!audioEl) return;
+  const currentVideoSrcRef = useRef<string | null>(null);
+  const isPlayingRef = useRef<boolean>(isPlaying);
+  isPlayingRef.current = isPlaying;
 
-    if (!activeAudioTrack || !activeAudioAsset) {
-      audioEl.pause();
-      return;
-    }
-
-    if (audioEl.src !== activeAudioAsset.objectUrl) {
-      audioEl.src = activeAudioAsset.objectUrl;
-    }
-
-    const audioLocalTime = currentTime - activeAudioTrack.timelineStart + activeAudioTrack.startTrim;
-    if (Math.abs(audioEl.currentTime - audioLocalTime) > 0.3) {
-      audioEl.currentTime = Math.max(0, audioLocalTime);
-    }
-
-    const effectiveVol = isMasterMuted ? 0 : Math.min(1, (activeAudioTrack.isMuted ? 0 : activeAudioTrack.volume) * masterVolume);
-    audioEl.volume = effectiveVol;
-
-    if (isPlaying) {
-      audioEl.play().catch(() => {});
-    } else {
-      audioEl.pause();
-    }
-  }, [activeAudioTrack, activeAudioAsset, currentTime, isPlaying, isMasterMuted, masterVolume]);
-
-  // Sync video element playback & position
+  // 1. Sync Video/Audio Sources and Volumes (without forced seeks during playback)
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !activeClipInfo || !activeAsset || activeClipInfo.clip.type !== "video") {
       return;
     }
 
-    if (video.src !== activeAsset.objectUrl) {
+    if (currentVideoSrcRef.current !== activeAsset.objectUrl) {
+      currentVideoSrcRef.current = activeAsset.objectUrl;
       video.src = activeAsset.objectUrl;
+      video.currentTime = activeClipInfo.localSourceTime;
+      if (isPlayingRef.current) {
+        video.play().catch(() => {});
+      }
     }
 
-    // Set playback speed
     video.playbackRate = Math.max(0.25, Math.min(4.0, activeClipInfo.clip.speed || 1.0));
-
-    // Set volume
     const clipVol = activeClipInfo.clip.isMuted ? 0 : activeClipInfo.clip.volume;
     video.volume = isMasterMuted ? 0 : Math.min(1, clipVol * masterVolume);
+  }, [
+    activeClipInfo?.clip.id,
+    activeAsset?.objectUrl,
+    activeClipInfo?.clip.speed,
+    activeClipInfo?.clip.volume,
+    activeClipInfo?.clip.isMuted,
+    isMasterMuted,
+    masterVolume,
+  ]);
 
-    // Sync seek
-    const desiredSourceTime = activeClipInfo.localSourceTime;
-    if (Math.abs(video.currentTime - desiredSourceTime) > 0.25) {
-      video.currentTime = desiredSourceTime;
-    }
+  // 2. Play / Pause Control
+  useEffect(() => {
+    const video = videoRef.current;
+    const audio = bgAudioRef.current;
 
     if (isPlaying) {
-      video.play().catch(() => {});
+      if (video && activeClipInfo?.clip.type === "video") {
+        video.play().catch(() => {});
+      }
+      if (audio && activeAudioTrack && activeAudioAsset) {
+        audio.play().catch(() => {});
+      }
     } else {
-      video.pause();
+      if (video) video.pause();
+      if (audio) audio.pause();
     }
-  }, [activeClipInfo, activeAsset, isPlaying, isMasterMuted, masterVolume]);
+  }, [isPlaying, activeClipInfo?.clip.type, activeAudioTrack, activeAudioAsset]);
 
-  // Playhead update loop during playback
+  // 3. Seek Synchronization (ONLY when paused to completely eliminate playback stutter)
+  useEffect(() => {
+    if (isPlaying) return;
+
+    const video = videoRef.current;
+    if (video && activeClipInfo && activeClipInfo.clip.type === "video") {
+      const desiredTime = activeClipInfo.localSourceTime;
+      if (Math.abs(video.currentTime - desiredTime) > 0.05) {
+        video.currentTime = desiredTime;
+      }
+    }
+
+    const audio = bgAudioRef.current;
+    if (audio && activeAudioTrack && activeAudioAsset) {
+      if (audio.src !== activeAudioAsset.objectUrl) {
+        audio.src = activeAudioAsset.objectUrl;
+      }
+      const desiredAudioTime = currentTime - activeAudioTrack.timelineStart + activeAudioTrack.startTrim;
+      if (Math.abs(audio.currentTime - desiredAudioTime) > 0.1) {
+        audio.currentTime = Math.max(0, desiredAudioTime);
+      }
+      const effectiveVol = isMasterMuted ? 0 : Math.min(1, (activeAudioTrack.isMuted ? 0 : activeAudioTrack.volume) * masterVolume);
+      audio.volume = effectiveVol;
+    }
+  }, [currentTime, isPlaying, activeClipInfo, activeAudioTrack, activeAudioAsset, isMasterMuted, masterVolume]);
+
+  // 4. Smooth Hardware-Accelerated Playback Loop (Video element drives time)
   useEffect(() => {
     if (!isPlaying) return;
 
     let animId: number;
-    let lastTimestamp = performance.now();
+    let lastWallTime = performance.now();
+    let lastThrottledTime = performance.now();
 
-    const loop = (now: number) => {
-      const deltaSeconds = (now - lastTimestamp) / 1000;
-      lastTimestamp = now;
+    const tick = (now: number) => {
+      const video = videoRef.current;
 
-      const nextTime = currentTime + deltaSeconds;
-      if (nextTime >= totalDuration) {
-        onTimeUpdate(totalDuration);
-        onTogglePlay(); // stop at end
+      if (activeClipInfo && activeAsset && activeClipInfo.clip.type === "video" && video) {
+        const speed = Math.max(0.25, Math.min(4.0, activeClipInfo.clip.speed || 1.0));
+        const clip = activeClipInfo.clip;
+        const currentSourceTime = video.currentTime;
+        const startTime = activeClipInfo.startTime;
+        const endTime = activeClipInfo.endTime;
+        const isReversed = Boolean(clip.isReversed);
+
+        let elapsedInClip: number;
+        let isClipEnded: boolean;
+
+        if (isReversed) {
+          elapsedInClip = Math.max(0, (clip.endTrim - currentSourceTime) / speed);
+          isClipEnded = currentSourceTime <= clip.startTrim + 0.04;
+        } else {
+          elapsedInClip = Math.max(0, (currentSourceTime - clip.startTrim) / speed);
+          isClipEnded = currentSourceTime >= clip.endTrim - 0.04;
+        }
+
+        const currentProjectTime = startTime + elapsedInClip;
+
+        // Clip boundary completion check
+        if (isClipEnded || currentProjectTime >= endTime - 0.03) {
+          if (endTime >= totalDuration - 0.05) {
+            onTimeUpdate(totalDuration);
+            onTogglePlay();
+            return;
+          } else {
+            // Smoothly jump to next clip
+            onSeek(endTime + 0.02);
+            return;
+          }
+        }
+
+        // Throttle React timeline state updates to ~30 FPS (~33ms)
+        // prevents React from starving the main thread with 60 re-renders/sec
+        if (now - lastThrottledTime >= 33) {
+          lastThrottledTime = now;
+          onTimeUpdate(currentProjectTime);
+        }
       } else {
-        onTimeUpdate(nextTime);
-        animId = requestAnimationFrame(loop);
+        // Image clip or gap: advance using delta time
+        const delta = (now - lastWallTime) / 1000;
+        lastWallTime = now;
+        const nextTime = currentTime + delta;
+
+        if (nextTime >= totalDuration) {
+          onTimeUpdate(totalDuration);
+          onTogglePlay();
+          return;
+        } else {
+          onTimeUpdate(nextTime);
+        }
       }
+
+      animId = requestAnimationFrame(tick);
     };
 
-    animId = requestAnimationFrame(loop);
-
-    return () => {
-      cancelAnimationFrame(animId);
-    };
-  }, [isPlaying, currentTime, totalDuration, onTimeUpdate, onTogglePlay]);
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [
+    isPlaying,
+    activeClipInfo,
+    activeAsset,
+    currentTime,
+    totalDuration,
+    onTimeUpdate,
+    onTogglePlay,
+    onSeek,
+  ]);
 
   // CSS Filter string calculation
   const filterStyle = useMemo(() => {
@@ -289,10 +377,17 @@ export function CanvasPreview({
       <audio ref={bgAudioRef} preload="auto" className="hidden" />
 
       {/* Main Aspect Ratio Canvas Viewport */}
-      <div className="relative w-full flex items-center justify-center bg-black/90 rounded-xl overflow-hidden min-h-[240px] sm:min-h-[340px] max-h-[420px] border border-white/5">
+      <div
+        onClick={() => {
+          onSelectOverlay?.(null);
+          onSelectText?.(null);
+        }}
+        className="relative w-full flex items-center justify-center bg-black/90 rounded-xl overflow-hidden min-h-[240px] sm:min-h-[340px] max-h-[420px] border border-white/5"
+      >
         <div
+          ref={stageRef}
           style={aspectRatioStyle}
-          className="relative w-full h-full max-h-[420px] flex items-center justify-center overflow-hidden bg-black"
+          className="relative w-full h-full max-h-[420px] flex items-center justify-center overflow-hidden bg-black select-none"
         >
           {/* Active Clip Video or Image */}
           {activeClipInfo && activeAsset ? (
@@ -305,7 +400,6 @@ export function CanvasPreview({
                   filter: filterStyle,
                   transform: transformStyle,
                   opacity: activeClipInfo.clip.opacity ?? 1.0,
-                  transition: "filter 0.1s ease, transform 0.1s ease",
                 }}
                 className="w-full h-full object-contain pointer-events-none"
               />
@@ -318,47 +412,170 @@ export function CanvasPreview({
                   filter: filterStyle,
                   transform: transformStyle,
                   opacity: activeClipInfo.clip.opacity ?? 1.0,
-                  transition: "filter 0.1s ease, transform 0.1s ease",
                 }}
                 className="w-full h-full object-contain pointer-events-none"
               />
             )
           ) : (
-            <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500">
+            <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500 pointer-events-none">
               <p className="text-xs">No media on timeline at {formatTimecode(currentTime)}</p>
             </div>
           )}
 
-          {/* Active Overlays (PIP) */}
+          {/* Active Overlays & Stickers (Draggable on screen) */}
           {activeOverlayLayers.map((overlay) => {
             const asset = project.assets.find((a) => a.id === overlay.assetId);
             if (!asset) return null;
+            const isSelected = selectedOverlayId === overlay.id;
+
+            const handlePointerDown = (e: React.PointerEvent) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onSelectOverlay?.(overlay.id);
+
+              if (!stageRef.current) return;
+              const stageRect = stageRef.current.getBoundingClientRect();
+              const startClientX = e.clientX;
+              const startClientY = e.clientY;
+              const initialX = overlay.positionX;
+              const initialY = overlay.positionY;
+
+              const handlePointerMove = (moveEv: PointerEvent) => {
+                const deltaX = moveEv.clientX - startClientX;
+                const deltaY = moveEv.clientY - startClientY;
+                const percentDeltaX = (deltaX / stageRect.width) * 100;
+                const percentDeltaY = (deltaY / stageRect.height) * 100;
+
+                const newX = Math.max(2, Math.min(98, Math.round((initialX + percentDeltaX) * 10) / 10));
+                const newY = Math.max(2, Math.min(98, Math.round((initialY + percentDeltaY) * 10) / 10));
+
+                onUpdateOverlay?.(overlay.id, { positionX: newX, positionY: newY });
+              };
+
+              const handlePointerUp = () => {
+                window.removeEventListener("pointermove", handlePointerMove);
+                window.removeEventListener("pointerup", handlePointerUp);
+              };
+
+              window.addEventListener("pointermove", handlePointerMove);
+              window.addEventListener("pointerup", handlePointerUp);
+            };
+
             return (
               <div
                 key={overlay.id}
+                onPointerDown={handlePointerDown}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectOverlay?.(overlay.id);
+                }}
                 style={{
                   position: "absolute",
                   left: `${overlay.positionX}%`,
                   top: `${overlay.positionY}%`,
                   transform: `translate(-50%, -50%) scale(${overlay.scale}) rotate(${overlay.rotation}deg)`,
                   opacity: overlay.opacity,
-                  maxWidth: "50%",
-                  maxHeight: "50%",
+                  maxWidth: "60%",
+                  maxHeight: "60%",
+                  touchAction: "none",
                 }}
-                className="pointer-events-none rounded-lg overflow-hidden border border-white/20 shadow-lg"
+                className={`group cursor-grab active:cursor-grabbing select-none rounded-lg pointer-events-auto transition-shadow ${
+                  isSelected
+                    ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-black/70 shadow-2xl z-30"
+                    : "hover:ring-1 hover:ring-amber-400/60 z-20"
+                }`}
+                title={`Sticker: ${overlay.name} (Click & drag to reposition)`}
               >
+                {/* Active selection bounding handles and live coordinates */}
+                {isSelected && (
+                  <>
+                    <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-amber-400 rounded-full border-2 border-slate-950 shadow pointer-events-none" />
+                    <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-amber-400 rounded-full border-2 border-slate-950 shadow pointer-events-none" />
+                    <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-amber-400 rounded-full border-2 border-slate-950 shadow pointer-events-none" />
+                    <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-amber-400 rounded-full border-2 border-slate-950 shadow pointer-events-none" />
+
+                    {/* Position readout pill floating above sticker */}
+                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-slate-950/90 border border-amber-400/60 text-[10px] font-mono text-amber-300 font-bold whitespace-nowrap shadow-xl pointer-events-none flex items-center gap-1">
+                      <Move className="w-2.5 h-2.5" />
+                      <span>X:{Math.round(overlay.positionX)}% Y:{Math.round(overlay.positionY)}%</span>
+                    </div>
+
+                    {/* Quick Delete action button */}
+                    {onDeleteOverlay && (
+                      <button
+                        type="button"
+                        onClick={(delEv) => {
+                          delEv.stopPropagation();
+                          onDeleteOverlay(overlay.id);
+                        }}
+                        className="absolute -top-3 -right-3 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg border border-white/20 transition hover:scale-110"
+                        title="Delete Sticker"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </>
+                )}
+
                 {asset.type === "image" ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={asset.objectUrl} alt={overlay.name} className="w-full h-auto object-cover" />
+                  <img
+                    src={asset.objectUrl}
+                    alt={overlay.name}
+                    draggable={false}
+                    className="w-full h-auto object-contain pointer-events-none select-none rounded-lg"
+                  />
                 ) : (
-                  <video src={asset.objectUrl} autoPlay loop muted playsInline className="w-full h-auto" />
+                  <video
+                    src={asset.objectUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-auto pointer-events-none select-none rounded-lg"
+                  />
                 )}
               </div>
             );
           })}
 
-          {/* Active Text Layers */}
+          {/* Active Text Layers (Draggable on screen) */}
           {activeTextLayers.map((layer) => {
+            const isSelected = selectedTextId === layer.id;
+
+            const handlePointerDown = (e: React.PointerEvent) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onSelectText?.(layer.id);
+
+              if (!stageRef.current) return;
+              const stageRect = stageRef.current.getBoundingClientRect();
+              const startClientX = e.clientX;
+              const startClientY = e.clientY;
+              const initialX = layer.positionX;
+              const initialY = layer.positionY;
+
+              const handlePointerMove = (moveEv: PointerEvent) => {
+                const deltaX = moveEv.clientX - startClientX;
+                const deltaY = moveEv.clientY - startClientY;
+                const percentDeltaX = (deltaX / stageRect.width) * 100;
+                const percentDeltaY = (deltaY / stageRect.height) * 100;
+
+                const newX = Math.max(5, Math.min(95, Math.round((initialX + percentDeltaX) * 10) / 10));
+                const newY = Math.max(5, Math.min(95, Math.round((initialY + percentDeltaY) * 10) / 10));
+
+                onUpdateText?.(layer.id, { positionX: newX, positionY: newY });
+              };
+
+              const handlePointerUp = () => {
+                window.removeEventListener("pointermove", handlePointerMove);
+                window.removeEventListener("pointerup", handlePointerUp);
+              };
+
+              window.addEventListener("pointermove", handlePointerMove);
+              window.addEventListener("pointerup", handlePointerUp);
+            };
+
             let animationClass = "";
             if (layer.animation === "fade") animationClass = "animate-in fade-in duration-300";
             if (layer.animation === "slide_bottom")
@@ -369,6 +586,11 @@ export function CanvasPreview({
             return (
               <div
                 key={layer.id}
+                onPointerDown={handlePointerDown}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectText?.(layer.id);
+                }}
                 style={{
                   position: "absolute",
                   left: `${layer.positionX}%`,
@@ -380,8 +602,14 @@ export function CanvasPreview({
                   textAlign: layer.alignment,
                   fontWeight: layer.isBold ? "bold" : "normal",
                   fontStyle: layer.isItalic ? "italic" : "normal",
+                  touchAction: "none",
                 }}
-                className={`pointer-events-none px-2.5 py-1 rounded-md max-w-[90%] whitespace-pre-wrap ${animationClass}`}
+                className={`cursor-grab active:cursor-grabbing select-none px-2.5 py-1 rounded-md max-w-[90%] whitespace-pre-wrap pointer-events-auto transition-shadow ${animationClass} ${
+                  isSelected
+                    ? "ring-2 ring-cyan-400 ring-offset-2 ring-offset-black/70 shadow-2xl z-30"
+                    : "hover:ring-1 hover:ring-cyan-400/60 z-20"
+                }`}
+                title="Text Layer (Click & drag to reposition)"
               >
                 {layer.text}
               </div>

@@ -140,7 +140,7 @@ export function EditorToolbar({
   ];
 
   return (
-    <div className="relative flex items-center justify-between px-4 py-2 bg-slate-950/90 border-y border-white/10 select-none overflow-x-auto">
+    <div className="relative flex items-center justify-between px-4 py-2 bg-slate-950/90 border-y border-white/10 select-none overflow-x-auto no-scrollbar">
       <div className="flex items-center gap-1 sm:gap-2 min-w-max">
         {tools.map((tool) => {
           const Icon = tool.icon;

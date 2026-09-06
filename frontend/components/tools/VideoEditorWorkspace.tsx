@@ -434,6 +434,13 @@ export function VideoEditorWorkspace() {
                   if (settings.aspectRatio) setAspectRatio(settings.aspectRatio);
                 }}
                 onOpenSettings={() => setIsSettingsOpen(true)}
+                selectedOverlayId={selectedOverlayId}
+                onSelectOverlay={(id) => selectOverlay(id)}
+                onUpdateOverlay={(id, partial) => updateOverlayLayer(id, partial)}
+                onDeleteOverlay={(id) => removeOverlayLayer(id)}
+                selectedTextId={selectedTextId}
+                onSelectText={(id) => selectText(id)}
+                onUpdateText={(id, partial) => updateTextLayer(id, partial)}
               />
             </div>
 
@@ -572,6 +579,13 @@ export function VideoEditorWorkspace() {
             onUpdateSettings={(settings) => {
               if (settings.aspectRatio) setAspectRatio(settings.aspectRatio);
             }}
+            selectedOverlayId={selectedOverlayId}
+            onSelectOverlay={(id) => selectOverlay(id)}
+            onUpdateOverlay={(id, partial) => updateOverlayLayer(id, partial)}
+            onDeleteOverlay={(id) => removeOverlayLayer(id)}
+            selectedTextId={selectedTextId}
+            onSelectText={(id) => selectText(id)}
+            onUpdateText={(id, partial) => updateTextLayer(id, partial)}
           />
         </div>
 
