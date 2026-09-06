@@ -33,3 +33,8 @@ infra/cloudflared/config.yml
 infra/cloudflared/*.json
 cloudflared-windows-*.exe
 config.yml
+
+# Scratch and debug files
+scratch/
+*_debug.png
+

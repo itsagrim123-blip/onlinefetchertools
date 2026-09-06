@@ -8,6 +8,7 @@ import { PhotoEditorWorkspace } from "@/components/tools/PhotoEditorWorkspace";
 import { ZipExtractorWorkspace } from "@/components/tools/ZipExtractorWorkspace";
 import { BackgroundRemoverWorkspace } from "@/components/tools/BackgroundRemoverWorkspace";
 import { AutoCaptionsWorkspace } from "@/components/tools/AutoCaptionsWorkspace";
+import { NoiseRemoverWorkspace } from "@/components/tools/NoiseRemoverWorkspace";
 import { DownloaderCard } from "@/components/DownloaderCard";
 import { BackendStatus } from "@/components/BackendStatus";
 import { SoundToggle } from "@/components/SoundToggle";
@@ -15,6 +16,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 const toolTitles: Record<string, string> = {
   youtube: "YouTube Downloader",
+  "ai-noise-remover": "AI Noise Remover",
   "auto-captions": "Auto Captions",
   "video-editor": "Video Editor",
   "video-to-gif": "Video to GIF",
@@ -53,6 +55,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const title = toolTitles[slug] ?? "File Tool";
   const isYoutube = slug === "youtube";
+  const isNoiseRemover = slug === "ai-noise-remover";
   const isAutoCaptions = slug === "auto-captions";
   const isVideoEditor = slug === "video-editor";
   const isPdfManager = slug === "pdf-page-manager";
@@ -99,6 +102,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           <p className="mx-auto mt-2 sm:mt-4 max-w-2xl text-xs sm:text-base leading-5 sm:leading-7 text-slate-400">
             {isYoutube
               ? "Analyze a public YouTube URL, choose a format, and download content you are permitted to use."
+              : isNoiseRemover
+              ? "Remove background noise and make voice recordings cleaner."
               : isAutoCaptions
               ? "Automatically generate accurate captions from speech and permanently burn them directly into your video."
               : isVideoEditor
@@ -116,6 +121,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
         </div>
         {isYoutube ? (
           <DownloaderCard />
+        ) : isNoiseRemover ? (
+          <NoiseRemoverWorkspace />
         ) : isAutoCaptions ? (
           <AutoCaptionsWorkspace />
         ) : isVideoEditor ? (

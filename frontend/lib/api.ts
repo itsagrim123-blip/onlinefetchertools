@@ -495,3 +495,101 @@ export function generateVttContent(segments: CaptionSegment[]): string {
   );
 }
 
+export type NoiseRemoverOptions = {
+  mode?: "auto" | "light" | "balanced" | "strong";
+  strength?: number;
+  voiceEnhancement?: boolean;
+  humRemoval?: "auto" | "50hz" | "60hz" | "off";
+  lowFrequencyCleanup?: "auto" | "60hz" | "80hz" | "100hz" | "off";
+  normalize?: boolean;
+  outputFormat?: "auto" | "mp3" | "wav" | "video";
+};
+
+export type NoiseAnalysisResult = {
+  filename: string;
+  duration: number;
+  size: number;
+  has_video: boolean;
+  sample_rate: number;
+  channels: number;
+  waveform: number[];
+  suggested_mode: string;
+};
+
+export async function analyzeMediaForNoise(file: File): Promise<NoiseAnalysisResult> {
+  const form = new FormData();
+  form.append("file", file);
+
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl("/api/media/noise-remover/analyze"), {
+      method: "POST",
+      body: form,
+    });
+  } catch {
+    throw new Error("Unable to reach the Online Fetcher Tools backend for audio analysis. Check server status.");
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Audio analysis failed" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+
+  return response.json() as Promise<NoiseAnalysisResult>;
+}
+
+export async function removeAudioNoise(
+  file: File,
+  options?: NoiseRemoverOptions
+): Promise<{ blob: Blob; filename: string; cleanedPeaks: number[] }> {
+  const form = new FormData();
+  form.append("file", file);
+  if (options?.mode) form.append("mode", options.mode);
+  if (typeof options?.strength === "number") form.append("strength", String(options.strength));
+  if (typeof options?.voiceEnhancement === "boolean") {
+    form.append("voice_enhancement", String(options.voiceEnhancement));
+  }
+  if (options?.humRemoval) form.append("hum_removal", options.humRemoval);
+  if (options?.lowFrequencyCleanup) form.append("low_frequency_cleanup", options.lowFrequencyCleanup);
+  if (typeof options?.normalize === "boolean") form.append("normalize", String(options.normalize));
+  if (options?.outputFormat) form.append("output_format", options.outputFormat);
+
+  const stem = file.name.replace(/\.[^/.]+$/, "");
+  const fallbackFilename = `${stem}_cleaned.mp3`;
+
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl("/api/media/noise-remover/process"), {
+      method: "POST",
+      body: form,
+    });
+  } catch {
+    throw new Error("Unable to reach the Online Fetcher Tools backend for noise removal. Check server status.");
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Noise removal failed" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+
+  const contentType = response.headers.get("content-type");
+  const filename = parseFilename(response.headers, fallbackFilename);
+  const rawBlob = await response.blob();
+  const defaultMime = filename.endsWith(".mp4") ? "video/mp4" : "audio/mpeg";
+  const mimeType = resolveMimeType(contentType, filename, defaultMime);
+  const blob = normalizeBlob(rawBlob, mimeType);
+
+  let cleanedPeaks: number[] = [];
+  const peaksHeader = response.headers.get("x-cleaned-peaks");
+  if (peaksHeader) {
+    try {
+      cleanedPeaks = JSON.parse(peaksHeader);
+    } catch {
+      cleanedPeaks = [];
+    }
+  }
+
+  return { blob, filename, cleanedPeaks };
+}
+
+

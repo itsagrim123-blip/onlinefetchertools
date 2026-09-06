@@ -20,6 +20,7 @@ from app.routes.file import router as file_router
 from app.routes.archive import router as archive_router
 from app.routes.media import router as media_router
 from app.routes.auto_captions import router as auto_captions_router
+from app.routes.noise_remover import audio_router as noise_remover_audio_router, router as noise_remover_router
 from app.errors import ClipFetchError
 from app.services.cleanup import CleanupService
 
@@ -31,12 +32,14 @@ settings = get_settings()
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     _.state.started_at = time.monotonic()
     cleanup_service = CleanupService()
-    # Non-blocking warm up of the AI background remover model session
+    # Non-blocking warm up of AI models
     from app.services.background_remover import BackgroundRemoverService
     from app.services.captions import AutoCaptionsService
+    from app.services.noise_remover import NoiseRemoverService
 
     asyncio.create_task(BackgroundRemoverService.get_instance().initialize())
     asyncio.create_task(AutoCaptionsService.get_instance().initialize())
+    asyncio.create_task(NoiseRemoverService.get_instance().initialize())
     try:
         yield
     finally:
@@ -65,6 +68,7 @@ app.add_middleware(
         "X-Filename",
         "X-Image-Width",
         "X-Image-Height",
+        "X-Cleaned-Peaks",
         "Cache-Control",
     ],
 )
@@ -73,6 +77,8 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(media_router)
 app.include_router(auto_captions_router)
+app.include_router(noise_remover_router)
+app.include_router(noise_remover_audio_router)
 app.include_router(image_router)
 app.include_router(pdf_router)
 app.include_router(file_router)
