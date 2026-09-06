@@ -1,19 +1,23 @@
-# ClipFetch ⚡
+# OnlineFetcherTools ⚡
 
 <div align="center">
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.3-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.3.4-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2.8-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.141.1-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![AI Engine](https://img.shields.io/badge/AI_Engine-rembg_%2F_ONNX-8A2BE2?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/danielgatis/rembg)
 [![Docker](https://img.shields.io/badge/Docker-Supported-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Developed by](https://img.shields.io/badge/Developed_by-Agrim_Kaushik-00C7B7?style=for-the-badge)](https://github.com/itsagrim123-blip)
 
-**A calm, powerful, and privacy-first workspace for all your media, video, image, PDF, and archive needs.**
+**A calm, powerful, and privacy-first web workspace for all your media downloading, video editing, AI background removal, image conversion, PDF manipulation, and archive workflows.**
 
-[Explore Features](#-features--tools-catalog) • [Architecture](#-architecture) • [Quickstart](#-quickstart-guide) • [Docker](#-docker-setup) • [Cloudflare Quick Tunnel](#-cloudflare-quick-tunnel-local--vercel) • [API Docs](#-api-documentation) • [Security & Legal](#-security--resource-safeguards)
+### **Developed by Agrim Kaushik**
+
+[Explore Features](#-features--tools-catalog) • [Architecture](#-architecture) • [Tech Stack](#-tech-stack) • [Quickstart](#-quickstart-guide) • [Docker](#-docker-setup) • [Cloudflare Quick Tunnel](#-cloudflare-quick-tunnel-local--vercel) • [API Docs](#-api-documentation) • [Security & Legal](#-security--resource-safeguards) • [Author & License](#-author--license)
 
 ---
 
@@ -21,77 +25,120 @@
 
 ## 📖 Overview
 
-**ClipFetch** is a modern media processing workspace built for creators, developers, and everyday users. Originally designed as an ethical, high-performance media downloader, ClipFetch has evolved into a comprehensive digital utility suite. 
+**OnlineFetcherTools** (formerly ClipFetch) is a high-performance, privacy-first digital utility suite and media processing workspace developed by **Agrim Kaushik**. 
 
-ClipFetch allows you to analyze permitted video metadata, download custom quality presets, trim and transcode videos, convert and compress photos (including Apple HEIC), manipulate PDFs (merge, split, reorder, compress, extract text), and create/extract archives — **all within a single, distraction-free interface without ads, popups, or cloud tracking**.
+Engineered for creators, developers, students, and everyday power users, OnlineFetcherTools delivers professional-grade multimedia tools directly through a unified, clutter-free web interface — **100% free of invasive advertisements, trackers, paywalls, or third-party cloud data retention**.
+
+With OnlineFetcherTools, you can:
+- 🎬 **Download & analyze permitted media** from supported video platforms with full metadata inspection, custom resolutions, and trimming.
+- ✂️ **Edit videos in a studio workspace** featuring a multi-clip timeline, real-time canvas transform, stickers/text overlays, and mobile portrait bottom-sheet controls.
+- 🪄 **Remove backgrounds with AI** using CPU-accelerated U2-Net deep learning models, fine edge refinement, and custom background coloring.
+- 🖼️ **Convert, compress, and edit photos**, including instant Apple HEIC to JPG conversion, two-way WebP/PNG/JPG pipelines, and lossless compression.
+- 📄 **Process PDFs with ease**: merge, split by page ranges, compress stream metadata, extract pages to PNG archives, reorder sheets, and extract plain text.
+- 📦 **Create and inspect archives** with built-in path sanitization to guard against directory traversal and Zip-Slip attacks.
+- 🔊 **Enjoy tactile audio feedback** powered by a zero-dependency Web Audio synthesizer engine.
 
 > [!IMPORTANT]
-> **Permitted Content Notice**: ClipFetch is engineered strictly for authorized, public domain, and user-owned content. Users are solely responsible for respecting copyright laws, digital rights, and the terms of service of any source platform.
+> **Permitted Content Notice**: OnlineFetcherTools is strictly engineered for authorized, public domain, and user-owned content. Users are solely responsible for adhering to relevant copyright legislation, intellectual property rights, and third-party platform Terms of Service.
 
 ---
 
 ## ✨ Features & Tools Catalog
 
-ClipFetch is organized into five dedicated suites:
+OnlineFetcherTools includes over 20+ specialized utilities organized across 6 dedicated suites:
 
 ### 🎬 1. Video & Audio Downloader
-* **Metadata Analysis**: Paste any supported video URL to fetch real-time metadata (title, uploader, duration, thumbnail, and stream bitrate details).
-* **Format & Preset Selection**: Pick from various video qualities (1080p, 720p, 480p, 360p) or separate audio streams (MP3, WAV, M4A).
-* **Background Processing**: Asynchronous download jobs with thread-safe polling progress updates.
-* **Clip Trimming**: Define optional start and end timestamps to download only the section you need.
+* **Real-Time Metadata Analysis**: Inspect video titles, creators, durations, stream bitrates, and thumbnail previews before initiating downloads.
+* **Flexible Quality Presets**: Select from high-definition video streams (1080p, 720p, 480p, 360p) or separate high-bitrate audio streams (MP3, WAV, M4A).
+* **Direct Timestamp Trimming**: Specify exact start and end timestamps (`HH:MM:SS`) to clip and download only the segment you need.
+* **Asynchronous Polling Queue**: Background worker threads with thread-safe progress monitoring (percentage, transfer speed, and estimated completion time).
 
-### ✂️ 2. Video & Audio Studio
-* **Video Editor**: Trim video clips, adjust playback speed (0.5x to 2.0x), rescale dimensions, tune output quality, and toggle audio tracks.
-* **Video to GIF**: Convert video sequences into high-quality, shareable GIFs with custom FPS and resolution controls.
-* **Frame Extractor**: Grab precise frame snapshots at any timestamp as JPG or PNG.
-* **Audio Extractor**: Strip audio tracks from video files directly into MP3, WAV, M4A, or OGG.
-* **Media Transcoder**: Convert between popular container formats (`.mp4`, `.webm`, `.mov`, `.mp3`, `.wav`).
+### ✂️ 2. Studio Video & Audio Suite
+* **Full-Featured Studio Video Editor**:
+  * **Desktop 4-Column Layout**: Tool drawer, media bin, interactive canvas preview, and properties inspector panel.
+  * **Multi-Clip Timeline**: Drag, trim, split, reorder, and sequence multiple video clips with frame-accurate scrubbing.
+  * **Interactive Canvas Preview**: Dynamic aspect ratio selector (16:9 widescreen, 9:16 vertical/Reels/Shorts, 1:1 square, 4:5 social), draggable sticker overlays, and text layers.
+  * **Mobile Portrait Bottom-Sheet**: Specialized mobile workspace (`MobileBottomSheet`) with optimized touch controls, preventing horizontal drag overflow on low-end devices.
+  * **Playback & Audio Controls**: Variable playback speed (0.5x to 2.0x), mute, and clip volume tuning.
+  * **Advanced Export Pipeline**: Export directly with selectable resolution, FPS, video codecs, and quality presets via server-side FFmpeg rendering.
+* **Video to GIF Converter**: Convert video clips into smooth, optimized animated GIFs with custom FPS and resolution controls.
+* **Frame Snapshot Extractor**: Grab frame-accurate, high-resolution snapshots at any timestamp as JPG or PNG.
+* **Audio Track Extractor**: Strip audio from video files into standalone MP3, WAV, M4A, or OGG tracks.
+* **Media Container Transcoder**: Seamlessly convert between popular media containers (`.mp4`, `.webm`, `.mov`, `.mp3`, `.wav`).
 
-### 🖼️ 3. Image Processing & Photo Studio
-* **Image Format Conversion**: Instant two-way conversion between **JPG**, **PNG**, and **WebP**.
-* **Apple HEIC Support**: Convert `.heic` photos from iOS devices into standard `.jpg`.
-* **Smart Compression**: Compress images with visual quality sliders to drastically reduce file sizes.
-* **Resize & Crop**: Precise pixel dimensions or fixed aspect ratio cropping (1:1, 16:9, 4:3, etc.).
-* **Rotate & Flip**: 90° / 180° / 270° orientation rotation and horizontal/vertical flipping.
+### 🪄 3. AI Background Remover (New!)
+* **Deep Learning Subject Segmentation**: CPU-accelerated U2-Net neural network inference powered by `rembg` and ONNX Runtime.
+* **Edge Refinement**: Optional fine edge detail enhancement for human hair, fur, and intricate object contours.
+* **Interactive Split Comparison Slider**: Real-time interactive before-and-after visual comparison with three viewing modes:
+  * *Slider Mode*: Smooth dragging divider to inspect foreground isolation.
+  * *Side-by-Side*: Simultaneous before and after preview.
+  * *Result Only*: Focused preview on isolated subjects.
+* **Custom Background Modes**:
+  * Clean Transparent PNG with preserved alpha channel.
+  * Crisp Studio White background.
+  * Solid Contrast Black background.
+  * Custom Color Picker with hex code support.
+* **Lossless Output**: Preserves full native image resolution and dimensions.
 
-### 📄 4. PDF Power Tools
-* **Merge PDF**: Combine multiple PDF documents in any order into a single unified file.
-* **Split PDF**: Extract all individual pages into a ZIP archive or specify custom page ranges (e.g., `1-3, 5, 7-10`).
-* **Compress PDF**: Optimize document streams and structural metadata to reduce size without sacrificing readability.
-* **PDF to Images**: Render pages into high-resolution PNG images bundled in a ZIP archive.
-* **Images to PDF**: Convert and arrange image sequences (JPG, PNG, WebP) into a clean, multi-page PDF.
-* **Page Manager**: Visually reorder pages, delete unneeded pages, and re-export.
-* **PDF to Text**: Extract raw text content directly into clean `.txt` files.
-* **Thumbnail Generator**: Fast preview thumbnails rendered on the fly.
+### 🖼️ 4. Image Processing & Photo Studio
+* **Format Conversion**: Instant two-way conversions between **JPG**, **PNG**, and **WebP** formats.
+* **Apple HEIC Decoding**: Seamlessly convert iOS `.heic` photos to standard `.jpg` without third-party cloud uploads.
+* **Smart Image Compressor**: Dynamic quality sliders providing real-time size reduction calculations while maintaining visual clarity.
+* **Image Resizer**: Exact pixel dimension scaling with optional aspect ratio preservation.
+* **Image Cropper**: Interactive cropping grid supporting custom dimensions and standard aspect ratios (1:1, 16:9, 4:3, 3:2).
+* **Image Rotator & Flipper**: 90°, 180°, 270° orientation rotation along with horizontal and vertical mirror flipping.
 
-### 📦 5. File & Archive Tools
-* **ZIP Creator**: Bundle multiple mixed files into an organized `.zip` file.
-* **ZIP Inspector**: Safely inspect file manifests, uncompressed sizes, and paths inside archives before extracting.
-* **ZIP Extractor**: Extract archives with built-in path sanitization to guard against directory traversal / zip-slip exploits.
+### 📄 5. PDF Power Tools
+* **PDF Merge**: Combine multiple individual PDF documents into one cleanly sequenced file.
+* **PDF Split**: Extract every page into a standalone ZIP archive or extract specific page ranges (e.g., `1-4, 7, 9-12`).
+* **PDF Compressor**: Strip redundant stream objects and compress internal PDF structures for smaller file sizes.
+* **PDF to Images**: Render entire documents into crisp, high-resolution PNG image bundles packaged in a ZIP archive.
+* **Images to PDF**: Compile collections of JPG, PNG, and WebP images into a cohesive, multi-page PDF document.
+* **PDF Page Manager**: Visual drag-and-drop workspace to preview page thumbnails, reorder sequences, delete unwanted pages, and re-export.
+* **PDF to Text**: Extract raw, searchable text strings into lightweight `.txt` files.
+
+### 📦 6. File & Archive Tools
+* **ZIP Creator**: Bundle multiple files of any type into an organized, compressed `.zip` archive.
+* **ZIP Inspector**: Safely examine archive hierarchies, file manifests, and uncompressed byte sizes prior to extraction.
+* **ZIP Extractor**: Extract archives with rigorous canonical path validation preventing path traversal and Zip-Slip vulnerabilities.
+
+### 🔊 7. Micro-Interactions & Audio Experience (New!)
+* **Synthesized Web Audio System**: Zero-dependency audio feedback engine (`useUISound` / `soundManager`) delivering tactile feedback for:
+  * File upload initialization
+  * Successful task processing
+  * Download ready events
+  * Interactive button clicks
+  * Error alerts
+* **Persistent Audio Toggle**: Global sound controls with preference stored in local browser state.
+* **Live Server Schedule Widget**: Real-time server running window indicator in headers and mobile drawers.
 
 ---
 
 ## 🏛 Architecture
 
-ClipFetch decouples a high-performance **Next.js 16 (App Router)** client from an asynchronous **FastAPI** backend processing service.
+OnlineFetcherTools decouples an ultra-responsive **Next.js 16 (App Router)** frontend from an asynchronous **FastAPI** Python processing service.
 
 ```mermaid
 flowchart TD
-    subgraph Client ["Frontend (Next.js 16 + React 19)"]
+    subgraph Client ["Frontend (Next.js 16.3 + React 19)"]
         UI["Modern Responsive UI\n(Tailwind CSS v4 + Lucide)"]
-        State["Client-side State & Polling Manager"]
+        Studio["Video Studio Workspace\n(4-Col Desktop + Mobile Drawer)"]
+        Audio["Web Audio Synthesizer\n(useUISound Engine)"]
+        State["Client State & Polling Manager"]
+        UI <--> Studio
+        UI <--> Audio
         UI <--> State
     end
 
-    subgraph Gateway ["Reverse Proxy / Tunnel (Optional)"]
+    subgraph Gateway ["Reverse Proxy / Gateway (Optional)"]
         CF["Cloudflare Quick Tunnel / Caddy / NGINX"]
     end
 
     subgraph Server ["Backend (FastAPI + Python 3.12)"]
-        API["FastAPI REST Endpoints\n(/api/analyze, /api/download, /api/pdf, /api/image, etc.)"]
-        RL["Sliding-Window Rate Limiter & Security Validator"]
-        Semaphores["Concurrency Semaphores\n(Media, PDF, Archive)"]
-        Worker["In-Memory Background Job Queue"]
+        API["FastAPI REST Endpoints\n(/api/analyze, /api/image, /api/media, /api/pdf, etc.)"]
+        RL["Sliding-Window Rate Limiter & SSRF Guard"]
+        Semaphores["Concurrency Semaphores\n(Media, PDF, AI Background)"]
+        Worker["In-Memory Background Job Pool"]
         Cleanup["Periodic Ephemeral Cleanup Service"]
         
         API --> RL
@@ -103,6 +150,7 @@ flowchart TD
     subgraph Engines ["Native Processing Engines"]
         YTDLP["yt-dlp Engine"]
         FFMPEG["FFmpeg / FFprobe"]
+        REMBG["rembg / ONNX Runtime\n(U2-Net AI Model)"]
         PILLOW["Pillow + pillow-heif"]
         PYMUPDF["PyMuPDF + pypdf"]
     end
@@ -111,6 +159,7 @@ flowchart TD
     CF --> API
     Worker --> YTDLP
     Worker --> FFMPEG
+    Worker --> REMBG
     Worker --> PILLOW
     Worker --> PYMUPDF
 ```
@@ -119,28 +168,31 @@ flowchart TD
 
 ## 🛠 Tech Stack
 
-| Domain | Technology | Details |
-| :--- | :--- | :--- |
-| **Frontend Framework** | Next.js 16.3 | App Router, Server Components & Client Workspaces |
-| **UI Library** | React 19 | Fast interactive state and component trees |
-| **Styling & Design** | Tailwind CSS v4 | Dark mode aesthetic, responsive grid system |
-| **Icons** | Lucide React | Clean, lightweight icon suite |
-| **Backend Framework** | FastAPI 0.141 | High-throughput asynchronous Python framework |
-| **Validation & Settings**| Pydantic v2 & Pydantic-Settings | Strict typing, environment validation, schema generation |
-| **Media Extraction** | yt-dlp & FFmpeg | Reliable metadata extraction, audio/video transcoding |
-| **Document Processing**| PyMuPDF (fitz) & pypdf | Blazing-fast PDF manipulation, text extraction, page splitting |
-| **Image Engine** | Pillow 11.3 & pillow-heif | Image manipulation, resizing, compression, HEIC decoding |
-| **Containerization** | Docker & Docker Compose | Multi-stage production container builds |
+| Domain | Technology | Version | Details |
+| :--- | :--- | :--- | :--- |
+| **Frontend Framework** | Next.js | `16.3.4` | App Router, Server & Client Components |
+| **UI Library** | React | `19.2.8` | Concurrent rendering, modern hooks |
+| **Styling** | Tailwind CSS | `v4` | Modern CSS engine, custom responsive studio breakpoints |
+| **Iconography** | Lucide React | `1.41.0` | Lightweight, scalable vector icons |
+| **Audio Feedback** | Web Audio API | Native | Synthesized micro-interaction audio effects |
+| **Backend Framework** | FastAPI | `0.141.1` | High-throughput asynchronous Python framework |
+| **Validation & Config** | Pydantic & Pydantic-Settings | `v2.13+` | Strict type validation, environment parsing |
+| **AI Background Removal**| rembg + ONNX Runtime | `2.0.83` | CPU-accelerated U2-Net foreground segmentation |
+| **Media Downloader** | yt-dlp | `2026.8.19` | Resilient metadata extraction and media streaming |
+| **Video & Audio Engine**| FFmpeg & FFprobe | System | Trimming, transcoding, GIF conversion, multi-clip pipelines |
+| **Document Processing** | PyMuPDF & pypdf | `1.26.4` / `6.0.0`| High-speed PDF rendering, page manipulation, text extraction |
+| **Image Engine** | Pillow & pillow-heif | `12.3.0` / `1.6.0`| Image manipulation, compression, resizing, HEIC decode |
+| **Containerization** | Docker & Compose | Multi-stage | Full containerized deployment with bundled FFmpeg |
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-.
+onlinefetchertools/
 ├── .env.example              # Global environment configuration template
-├── .gitignore                # Git ignore rules for node_modules, .venv, downloads
-├── docker-compose.yml        # Multi-container orchestration (frontend + backend)
+├── .gitignore                # Git ignore patterns (.venv, node_modules, downloads)
+├── docker-compose.yml        # Multi-container orchestration (Next.js + FastAPI)
 ├── README.md                 # Project documentation
 ├── scripts/                  # Automated PowerShell helper scripts
 │   ├── start-backend.ps1     # Launch FastAPI with custom CORS origins
@@ -148,50 +200,66 @@ flowchart TD
 │   └── start-cloudflared.ps1 # Launch zero-config Cloudflare Quick Tunnel
 ├── backend/
 │   ├── app/
-│   │   ├── config.py         # Pydantic Settings & environment parsing
-│   │   ├── errors.py         # Unified ClipFetch custom exceptions
+│   │   ├── config.py         # Pydantic Settings & environment variables
+│   │   ├── errors.py         # Unified error handling & exceptions
 │   │   ├── main.py           # FastAPI entrypoint, middleware, lifespan
 │   │   ├── models.py         # Pydantic request/response schemas
 │   │   ├── routes/
 │   │   │   ├── archive.py    # ZIP create, inspect, extract endpoints
-│   │   │   ├── file.py       # Video edit, convert, GIF, frame extraction
-│   │   │   ├── health.py     # Health status and Jinja2 HTML dashboard
-│   │   │   ├── image.py      # Image convert, compress, crop, resize, rotate
-│   │   │   ├── media.py      # yt-dlp analyze & download job routes
-│   │   │   └── pdf.py        # PDF merge, split, compress, pages, OCR/text
+│   │   │   ├── file.py       # Video editing, convert, GIF, frame extraction
+│   │   │   ├── health.py     # Health status and HTML dashboard
+│   │   │   ├── image.py      # Convert, compress, crop, resize, and remove-background
+│   │   │   ├── media.py      # yt-dlp analyze & background download routes
+│   │   │   └── pdf.py        # PDF merge, split, compress, page manager, text
 │   │   ├── services/
-│   │   │   ├── archive_tools.py # Zipfile manipulation routines
-│   │   │   ├── cleanup.py    # Background thread for old temp file removal
-│   │   │   ├── downloader.py # Download job thread pool & progress monitor
-│   │   │   ├── extractor.py  # yt-dlp wrapper & metadata parser
-│   │   │   ├── image_tools.py# Pillow manipulation & HEIC routines
-│   │   │   ├── media_tools.py# FFmpeg process execution & filters
-│   │   │   └── pdf_tools.py  # PyMuPDF/pypdf routines
-│   │   ├── templates/        # Jinja2 HTML server status page
+│   │   │   ├── archive_tools.py      # Zipfile handling routines
+│   │   │   ├── background_remover.py # rembg AI session & U2-Net warmup
+│   │   │   ├── cleanup.py            # Ephemeral temp file lifecycle manager
+│   │   │   ├── downloader.py         # Thread-safe download job monitor
+│   │   │   ├── extractor.py          # yt-dlp metadata wrapper
+│   │   │   ├── image_tools.py        # Pillow, HEIC, and background removal processing
+│   │   │   ├── media_tools.py        # FFmpeg process execution & filters
+│   │   │   └── pdf_tools.py          # PyMuPDF and pypdf routines
 │   │   └── utils/
-│   │       ├── concurrency.py# Async semaphores for heavy CPU workloads
-│   │       ├── files.py      # Upload handling & directory lifecycle
-│   │       ├── rate_limit.py # In-memory sliding window rate limiters
-│   │       └── validation.py # URL validation & SSRF protection
-│   ├── Dockerfile            # Python 3.12-slim + FFmpeg container image
+│   │       ├── concurrency.py        # Concurrency semaphores (Media, PDF, AI)
+│   │       ├── files.py              # File lifecycle & upload handling
+│   │       ├── rate_limit.py         # In-memory sliding-window rate limiters
+│   │       └── validation.py         # SSRF protection & input validation
+│   ├── Dockerfile            # Python 3.12-slim + FFmpeg production container
 │   ├── requirements.txt      # Python dependencies
-│   └── tests/                # Pytest suites
-│       ├── test_health.py
-│       └── test_validation.py
+│   └── tests/                # Pytest suites (health, validation, routes)
 └── frontend/
     ├── app/
-    │   ├── globals.css       # Tailwind CSS styles and custom utility classes
-    │   ├── layout.tsx        # Base root layout, header, footer
-    │   ├── page.tsx          # Homepage with tool catalog & search
-    │   └── tools/
-    │       └── [slug]/       # Dynamic tool workspace runner
+    │   ├── globals.css       # Tailwind CSS v4 styling & dark scrollbar utilities
+    │   ├── layout.tsx        # Base root layout, navigation header, footer
+    │   ├── page.tsx          # Homepage with tool catalog & instant search
+    │   └── tools/[slug]/     # Dynamic tool workspace runner
     ├── components/
+    │   ├── BackendStatus.tsx # Live backend health & running schedule indicator
     │   ├── DownloaderCard.tsx# Interactive media downloader component
-    │   ├── Header.tsx        # Navigation header
-    │   ├── Footer.tsx        # Footer with legal disclaimer
-    │   └── tools/            # Specialized workspace components (Video, PDF, Image, etc.)
+    │   ├── Header.tsx        # Responsive navigation with tools dropdown
+    │   ├── Footer.tsx        # Footer with copyright and legal disclaimer
+    │   ├── SoundToggle.tsx   # Global Web Audio sound effects toggle
+    │   └── tools/
+    │       ├── BackgroundRemoverWorkspace.tsx # AI background remover with split comparison
+    │       ├── FileToolWorkspace.tsx          # General file & media convert workspace
+    │       ├── PdfPageManagerWorkspace.tsx    # Visual PDF page reorder/delete
+    │       ├── PhotoEditorWorkspace.tsx       # Cropping, resizing, rotation studio
+    │       ├── ZipExtractorWorkspace.tsx      # Archive inspection & extraction
+    │       └── video-editor/                  # Comprehensive Studio Video Editor
+    │           ├── components/
+    │           │   ├── CanvasPreview.tsx      # Video canvas with overlays & aspect ratios
+    │           │   ├── Timeline.tsx           # Multi-clip visual timeline
+    │           │   ├── ExportModal.tsx        # Export configuration modal
+    │           │   └── mobile/                # MobileBottomSheet & touch controls
+    │           └── types.ts                   # Editor state & clip type definitions
+    ├── lib/
+    │   ├── api.ts            # Client API client with streaming & download helpers
+    │   └── sounds/
+    │       ├── soundManager.ts # Synthesized Web Audio API sound generator
+    │       └── useUISound.ts   # React hook for UI audio micro-interactions
     ├── Dockerfile            # Node 20-alpine Next.js production build
-    ├── package.json          # Node dependencies & scripts
+    ├── package.json          # Node dependencies & npm scripts
     └── tsconfig.json         # TypeScript configuration
 ```
 
@@ -199,12 +267,12 @@ flowchart TD
 
 ## 📋 Prerequisites
 
-Before running ClipFetch locally, ensure your machine has:
+Before running OnlineFetcherTools locally, ensure your environment meets the following requirements:
 
 - **Node.js**: `v20.0.0+`
 - **npm**: `v10.0.0+`
 - **Python**: `3.12+`
-- **FFmpeg & FFprobe**: Installed and added to system `PATH`
+- **FFmpeg & FFprobe**: Installed and available on your system `PATH`
 
 ### FFmpeg Installation
 
@@ -215,9 +283,9 @@ Install via Windows Package Manager (`winget`):
 ```powershell
 winget install Gyan.Dev.FFmpeg
 ```
-*Or download the release build from [ffmpeg.org](https://www.ffmpeg.org/download.html) and add the `bin/` directory to your System Environment Variables `PATH`.*
+*Alternatively, download a build from [ffmpeg.org](https://www.ffmpeg.org/download.html) and append the `bin/` directory to your System Environment `PATH`.*
 
-Verify in PowerShell:
+Verify installation:
 ```powershell
 ffmpeg -version
 ffprobe -version
@@ -248,20 +316,20 @@ sudo apt-get install -y ffmpeg
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/<your-username>/clipfetch.git
-cd clipfetch
+git clone https://github.com/itsagrim123-blip/onlinefetchertools.git
+cd onlinefetchertools
 ```
 
 ### 2. Configure Environment Variables
-Copy the root `.env.example` file:
+Copy the root `.env.example` template:
 
-**Bash:**
+**Bash / macOS / Linux:**
 ```bash
 cp .env.example .env
 cp .env.example frontend/.env.local
 ```
 
-**PowerShell:**
+**PowerShell (Windows):**
 ```powershell
 Copy-Item .env.example .env
 Copy-Item .env.example frontend/.env.local
@@ -277,10 +345,10 @@ Copy-Item .env.example frontend/.env.local
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
+# Install dependencies (including AI background removal engine)
 pip install -r backend\requirements.txt
 
-# Run FastAPI backend
+# Start FastAPI backend server
 cd backend
 uvicorn app.main:app --reload --port 8000
 ```
@@ -294,21 +362,21 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run FastAPI backend
+# Start FastAPI backend server
 cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-> **Backend Access:**
-> - API Root / HTML Dashboard: [http://localhost:8000](http://localhost:8000)
-> - Interactive Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
-> - Service Health Check: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+> **Backend Verification:**
+> - HTML Dashboard / Status: [http://localhost:8000](http://localhost:8000)
+> - Interactive OpenAPI Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+> - System Health Check: [http://localhost:8000/api/health](http://localhost:8000/api/health)
 
 ---
 
 ### 4. Frontend Setup
 
-Open a new terminal session in the project root:
+Open a new terminal in the project root directory:
 
 ```bash
 cd frontend
@@ -338,18 +406,18 @@ npm test
 
 ## 🐳 Docker Setup
 
-ClipFetch includes full Docker and Docker Compose support out of the box. FFmpeg, Python dependencies, Node packages, and volume permissions are handled automatically inside the containers.
+OnlineFetcherTools includes full multi-container Docker Compose configuration. FFmpeg binaries, Python libraries, Node dependencies, and permissions are pre-configured.
 
 ```bash
-# Build and spin up both containers
+# Build and run containers in background
 docker compose up --build
 ```
 
-- **Frontend** will be live at: `http://localhost:3000`
-- **Backend** will be live at: `http://localhost:8000`
-- Downloads and scratch files are stored safely inside the Docker volume `backend_downloads`.
+- **Frontend**: `http://localhost:3000`
+- **Backend**: `http://localhost:8000`
+- Downloaded and temporary files reside safely within the `backend_downloads` Docker volume.
 
-To stop the containers:
+To shut down containers:
 ```bash
 docker compose down
 ```
@@ -358,7 +426,7 @@ docker compose down
 
 ## 🌐 Cloudflare Quick Tunnel (Local + Vercel)
 
-Want to test your production frontend on **Vercel** connected to your local backend **without port-forwarding, DNS setup, or paying for hosting**? Use a free Cloudflare Quick Tunnel.
+If your frontend is hosted on **Vercel** and you want to connect it to your local backend without opening router ports or paying for cloud servers, launch a zero-config Cloudflare Quick Tunnel:
 
 ```text
 [ Vercel Frontend (HTTPS) ] 
@@ -367,31 +435,29 @@ Want to test your production frontend on **Vercel** connected to your local back
 [ Cloudflare Quick Tunnel (https://*.trycloudflare.com) ]
        │
        ▼
-[ Local Machine (http://localhost:8000) - FastAPI ]
+[ Local Development Machine (http://localhost:8000) - FastAPI ]
 ```
 
-### Setup Steps:
+### Steps:
 
 1. **Install `cloudflared`**:
-   - Download the Windows binary from [Cloudflare](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) or place `cloudflared-windows-amd64.exe` on your system.
-   - Verify: `cloudflared --version`.
-2. **Execute Helper Scripts (in separate terminals)**:
+   - Download the official binary from [Cloudflare](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) or place `cloudflared.exe` on your system.
+2. **Execute Automated Helper Scripts**:
 
    ```powershell
-   # Terminal 1: Start FastAPI with your Vercel URL permitted in CORS
+   # Terminal 1: Start backend with your Vercel origin allowed in CORS
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1 -FrontendOrigin https://your-project.vercel.app
 
-   # Terminal 2: Verify local FastAPI before exposing it
+   # Terminal 2: Verify local backend readiness
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-backend.ps1
 
-   # Terminal 3: Launch the Cloudflare Quick Tunnel
+   # Terminal 3: Launch the Cloudflare Tunnel
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-cloudflared.ps1
    ```
 
-3. **Configure Vercel**:
+3. **Link to Vercel**:
    - Copy the generated `https://<unique-subdomain>.trycloudflare.com` URL printed in Terminal 3.
-   - Go to **Vercel Project Settings > Environment Variables**.
-   - Set `NEXT_PUBLIC_API_URL` to that URL.
+   - In **Vercel Project Settings > Environment Variables**, set `NEXT_PUBLIC_API_URL` to that URL.
    - Redeploy the frontend.
 
 ---
@@ -399,40 +465,36 @@ Want to test your production frontend on **Vercel** connected to your local back
 ## 🚢 Production Deployment
 
 ```text
-+-------------------------+            +---------------------------------+
-|     Vercel Deployment   |            |  Docker Host (VPS / Cloud VM)   |
-|   (Next.js 16 Frontend) | ---------> |   (FastAPI + yt-dlp + FFmpeg)   |
-|  NEXT_PUBLIC_API_URL    |   HTTPS    |      FRONTEND_ORIGIN            |
-+-------------------------+            +---------------------------------+
++------------------------------+            +---------------------------------+
+|      Vercel Deployment       |            |   Docker Host (VPS / Cloud VM)  |
+|    (Next.js 16 Frontend)     | ---------> |   (FastAPI + rembg + FFmpeg)    |
+|   NEXT_PUBLIC_API_URL        |   HTTPS    |      FRONTEND_ORIGIN            |
++------------------------------+            +---------------------------------+
 ```
 
 > [!WARNING]
-> **Do not deploy the FastAPI backend as a Vercel Serverless Function**. yt-dlp, FFmpeg transcoding, and in-memory background download jobs require a persistent runtime environment with binary utilities installed.
+> **Do not deploy the FastAPI backend to a serverless function** (e.g. AWS Lambda or Vercel Serverless). Long-running FFmpeg transcode operations, ONNX AI inference, and yt-dlp stream downloading require a persistent server environment with native binaries.
 
-### 1. Backend on a VPS (Docker / Ubuntu / Debian)
-1. Install Docker on your server.
-2. Clone this repository onto the server.
-3. Build the backend Docker image:
-   ```bash
-   docker build -t clipfetch-backend ./backend
-   ```
-4. Run the container with persistent storage and your Vercel URL configured:
-   ```bash
-   docker run -d --name clipfetch-backend \
-     --restart unless-stopped \
-     -p 8000:8000 \
-     -e FRONTEND_ORIGIN="https://clipfetch.vercel.app" \
-     -v clipfetch-downloads:/app/downloads \
-     clipfetch-backend
-   ```
-5. Place an SSL reverse proxy (such as Caddy, NGINX, or Cloudflare) in front of port 8000 to serve over `https://api.yourdomain.com`.
+### 1. Backend on a VPS (Docker)
+```bash
+# Build backend container
+docker build -t onlinefetchertools-backend ./backend
+
+# Run container with persistent storage and Vercel origin
+docker run -d --name onlinefetchertools-backend \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  -e FRONTEND_ORIGIN="https://onlinefetchertools.vercel.app" \
+  -v onlinefetchertools-downloads:/app/downloads \
+  onlinefetchertools-backend
+```
 
 ### 2. Frontend on Vercel
-1. Import the repository into [Vercel](https://vercel.com/).
+1. Import repository into [Vercel](https://vercel.com/).
 2. Set the **Root Directory** to `frontend`.
 3. Add Environment Variable:
-   - `NEXT_PUBLIC_API_URL`: `https://api.yourdomain.com`
-4. Deploy!
+   - `NEXT_PUBLIC_API_URL`: `https://api.yourdomain.com` (or your Cloudflare Tunnel URL).
+4. Click **Deploy**.
 
 ---
 
@@ -440,29 +502,29 @@ Want to test your production frontend on **Vercel** connected to your local back
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
-| `BACKEND_PORT` | `8000` | Port on which the FastAPI application listens |
+| `BACKEND_PORT` | `8000` | Port for the FastAPI backend server |
 | `FRONTEND_ORIGIN` | `http://localhost:3000,http://127.0.0.1:3000` | Allowed CORS origins (comma-separated list) |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Target backend URL embedded in the frontend bundle |
-| `MAX_DOWNLOAD_SIZE_MB`| `2048` | Hard size ceiling for downloaded media files (MB) |
-| `MAX_UPLOAD_SIZE_MB` | `200` | Hard size ceiling for file uploads (MB) |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL consumed by the Next.js frontend |
+| `MAX_DOWNLOAD_SIZE_MB`| `2048` | Maximum permissible downloaded media size in MB |
+| `MAX_UPLOAD_SIZE_MB` | `200` | Maximum permissible file upload size in MB |
 | `MAX_CONCURRENT_DOWNLOADS` | `2` | Number of simultaneous background download worker threads |
-| `TEMP_FILE_RETENTION_MINUTES` | `30` | Age after which completed download files are automatically pruned |
-| `MAX_ANALYZE_REQUESTS_PER_MINUTE` | `20` | Rate limit for metadata extraction requests |
-| `MAX_DOWNLOAD_REQUESTS_PER_MINUTE` | `10` | Rate limit for download job creations |
-| `DOWNLOAD_DIR` | `downloads` | Local filesystem directory for storing temporary output files |
-| `REQUEST_TIMEOUT_SECONDS` | `45` | Network timeout for remote metadata inspection |
-| `RATE_LIMIT_WINDOW_SECONDS` | `60` | Rolling time window for client IP rate limiters |
+| `TEMP_FILE_RETENTION_MINUTES` | `30` | Time after which completed ephemeral files are pruned |
+| `MAX_ANALYZE_REQUESTS_PER_MINUTE` | `20` | Rate limit for URL metadata inspection requests |
+| `MAX_DOWNLOAD_REQUESTS_PER_MINUTE` | `10` | Rate limit for media download job creation |
+| `DOWNLOAD_DIR` | `downloads` | Local directory for storing temporary output files |
+| `REQUEST_TIMEOUT_SECONDS` | `45` | HTTP request timeout for metadata inspection |
+| `RATE_LIMIT_WINDOW_SECONDS` | `60` | Rolling time window in seconds for client IP rate limiters |
 
 ---
 
 ## 📡 API Documentation
 
-Interactive OpenAPI documentation is generated automatically by FastAPI:
+Interactive API documentation is generated by FastAPI:
 - **Swagger UI**: `http://localhost:8000/docs`
 - **ReDoc**: `http://localhost:8000/redoc`
 - **Server Health Dashboard**: `http://localhost:8000/`
 
-### Primary Endpoints Overview
+### Primary Endpoints
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
@@ -471,15 +533,16 @@ Interactive OpenAPI documentation is generated automatically by FastAPI:
 | `POST`| `/api/download` | Queue background media download job |
 | `GET` | `/api/download/{job_id}/status` | Poll download job status, progress %, and speed |
 | `GET` | `/api/download/{job_id}/file` | Stream or download the completed media file |
-| `POST`| `/api/media/convert` | Transcode audio or video to another format |
-| `POST`| `/api/media/edit` | Trim, resize, or alter playback speed of a video |
-| `POST`| `/api/media/video-to-gif` | Convert video clip into an animated GIF |
-| `POST`| `/api/media/extract-frame`| Extract an exact video frame at a given timestamp |
+| `POST`| `/api/image/remove-background` | **(New)** AI background removal with U2-Net, edge refinement & custom color |
 | `POST`| `/api/image/convert` | Convert images between JPG, PNG, and WebP |
 | `POST`| `/api/image/compress` | Compress image with adjustable quality slider |
 | `POST`| `/api/image/resize` | Resize image by width/height maintaining aspect ratio |
 | `POST`| `/api/image/crop` | Crop image with bounding box coordinates |
 | `POST`| `/api/image/rotate` | Rotate (90/180/270°) and flip (horizontal/vertical) |
+| `POST`| `/api/media/convert` | Transcode audio or video to another format |
+| `POST`| `/api/media/edit` | Trim, resize, or alter playback speed of a video |
+| `POST`| `/api/media/video-to-gif` | Convert video clip into an animated GIF |
+| `POST`| `/api/media/extract-frame`| Extract an exact video frame at a given timestamp |
 | `POST`| `/api/pdf/merge` | Merge multiple PDF files into one |
 | `POST`| `/api/pdf/split` | Split PDF into individual pages or specific ranges |
 | `POST`| `/api/pdf/compress` | Compress PDF document streams |
@@ -495,46 +558,34 @@ Interactive OpenAPI documentation is generated automatically by FastAPI:
 
 ## 🔒 Security & Resource Safeguards
 
-ClipFetch is built from the ground up with defensive engineering practices:
+OnlineFetcherTools is built with defensive engineering standards:
 
-* **Strict SSRF Mitigation**: Every requested video URL is resolved and checked against RFC 1918 private IP subnets, loopback interfaces (`127.0.0.1`, `localhost`), link-local addresses, and cloud instance metadata addresses (`169.254.169.254`).
-* **Concurrency Semaphores**: Resource-intensive operations (video encoding via FFmpeg, PDF manipulation via PyMuPDF, and zip extraction) are isolated behind dedicated concurrency semaphores to protect host memory and CPU.
-* **Upload & Download Caps**: Strict byte-stream ceilings prevent buffer exhaustion or disk-filling attacks (`MAX_DOWNLOAD_SIZE_MB` and `MAX_UPLOAD_SIZE_MB`).
-* **Zip-Slip Attack Immunity**: The archive extractor validates canonical destination paths to prevent malicious ZIP archives containing relative path traversals (`../../etc/passwd`).
-* **Ephemeral Data Lifecycle**: File operations occur in unique UUID work directories. Completed downloads and work artifacts are removed immediately after delivery via Starlette `BackgroundTask` or pruned automatically by the periodic `CleanupService`.
+* **Strict SSRF Mitigation**: Every video URL is parsed and validated against RFC 1918 private subnets, loopback addresses (`127.0.0.1`, `localhost`), link-local IPs, and cloud metadata endpoints (`169.254.169.254`).
+* **Concurrency Semaphores**: CPU/RAM-heavy operations (AI background removal, FFmpeg video encoding, PDF manipulation, and archive decompression) run behind dedicated asynchronous semaphores.
+* **Upload & Download Ceilings**: Strict byte limits prevent buffer exhaustion or disk-filling exploits (`MAX_DOWNLOAD_SIZE_MB` and `MAX_UPLOAD_SIZE_MB`).
+* **Zip-Slip Attack Immunity**: Canonical path verification ensures archive extractors cannot overwrite files outside the temporary working directory.
+* **Ephemeral Workspaces**: Every file operation takes place in an isolated UUID directory. Completed files are removed immediately upon transmission or purged automatically by the `CleanupService`.
 
 ---
 
 ## ⚖️ Legal & Ethical Notice
 
-ClipFetch is developed for educational, archival, and legitimate utility purposes.
+OnlineFetcherTools is developed for educational, archival, and legitimate utility purposes.
 
-* Users must ensure they have all necessary legal rights, licenses, or explicit permissions from copyright owners before downloading or modifying any media.
-* ClipFetch does **not** bypass DRM, access-control mechanisms, paid subscriptions, or authentication paywalls.
-* The maintainers and contributors of ClipFetch assume no responsibility or liability for any misuse, copyright infringement, or violation of third-party Terms of Service committed by end users.
+* Users must possess all necessary legal rights, licenses, or explicit permissions from copyright holders before processing any media.
+* OnlineFetcherTools does **not** bypass DRM, encryption, access controls, paid subscriptions, or paywalls.
+* The maintainers assume no liability for misuse, copyright infringement, or violation of third-party Terms of Service committed by end users.
 
 ---
 
-## 🤝 Contributing
+## 👨‍💻 Author & Credits
 
-Contributions are welcome! If you'd like to improve ClipFetch:
+**OnlineFetcherTools** is designed and developed by **Agrim Kaushik**.
 
-1. **Fork** the repository.
-2. Create your feature branch:
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. Commit your changes:
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-4. Push to your branch:
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-5. Open a **Pull Request**.
+* **Lead Developer**: [Agrim Kaushik](https://github.com/itsagrim123-blip)
+* **GitHub Repository**: [itsagrim123-blip/onlinefetchertools](https://github.com/itsagrim123-blip/onlinefetchertools)
 
-Please ensure backend tests pass with `pytest backend/tests` and frontend linting/tests pass with `npm run lint && npm test`.
+Contributions, feature requests, and feedback are always welcome! Feel free to open an issue or submit a pull request.
 
 ---
 
@@ -544,6 +595,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-Made with ❤️ for a cleaner, calmer web.
+Made with ❤️ by **Agrim Kaushik** for a cleaner, calmer, and more powerful web.
 
 </div>
