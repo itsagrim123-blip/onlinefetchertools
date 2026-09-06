@@ -55,3 +55,4 @@ export function EditorSidebar({ activeTab, onSelectTab }: EditorSidebarProps) {
     </aside>
   );
 }
+
