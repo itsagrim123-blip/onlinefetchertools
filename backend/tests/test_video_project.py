@@ -11,6 +11,7 @@ from app.main import app
 from app.services.media_tools import validate_media_file
 from app.services.video_project import (
     AudioTrackModel,
+    ClipTransitionModel,
     ExportSettingsModel,
     ProjectSettingsModel,
     TextLayerModel,
@@ -358,3 +359,114 @@ def test_advanced_features_render(tmp_path):
     meta = validate_media_file(out_file, expect_video=True, expect_audio=True)
     assert meta["has_video"] is True
     assert meta["has_audio"] is True
+
+
+def test_render_with_transitions(tmp_path):
+    vid1 = tmp_path / "vid1.mp4"
+    vid2 = tmp_path / "vid2.mp4"
+    make_synthetic_video(vid1, duration=3)
+    make_synthetic_video(vid2, duration=3)
+
+    manifest = VideoProjectManifest(
+        title="Transitions Test",
+        settings=ProjectSettingsModel(aspect_ratio="16:9", fps=25),
+        clips=[
+            VideoClipModel(
+                id="clip1",
+                asset_id="v1",
+                name="first.mp4",
+                type="video",
+                source_duration=3.0,
+                timeline_start=0.0,
+                start_trim=0.0,
+                end_trim=2.0,
+                transition=ClipTransitionModel(type="wipe_left", duration=0.6),
+            ),
+            VideoClipModel(
+                id="clip2",
+                asset_id="v2",
+                name="second.mp4",
+                type="video",
+                source_duration=3.0,
+                timeline_start=2.0,
+                start_trim=0.0,
+                end_trim=2.0,
+            ),
+        ],
+        export_settings=ExportSettingsModel(
+            format="mp4",
+            resolution="480p",
+            quality="medium",
+            fps=25,
+        ),
+    )
+
+    cmd = build_ffmpeg_command(manifest, {"v1": vid1, "v2": vid2}, tmp_path / "trans.mp4")
+    cmd_str = " ".join(cmd)
+    assert "xfade=transition=wipeleft" in cmd_str
+    assert "acrossfade=d=0.6" in cmd_str
+
+    out_file = tmp_path / "rendered_transitions.mp4"
+    execute_project_render(manifest, {"v1": vid1, "v2": vid2}, out_file)
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+    meta = validate_media_file(out_file, expect_video=True, expect_audio=True)
+    assert meta["has_video"] is True
+    assert meta["has_audio"] is True
+
+
+def test_render_with_timeline_gaps(tmp_path):
+    vid1 = tmp_path / "vid1.mp4"
+    vid2 = tmp_path / "vid2.mp4"
+    make_synthetic_video(vid1, duration=2)
+    make_synthetic_video(vid2, duration=2)
+
+    # Clip 1: 0.5s initial gap, 1.5s duration (ends at 2.0s)
+    # Gap: 1.0s (from 2.0s to 3.0s)
+    # Clip 2: starts at 3.0s, 1.5s duration
+    manifest = VideoProjectManifest(
+        title="Timeline Gaps Test",
+        settings=ProjectSettingsModel(aspect_ratio="16:9", fps=25),
+        clips=[
+            VideoClipModel(
+                id="clip1",
+                asset_id="v1",
+                name="clip1.mp4",
+                type="video",
+                source_duration=2.0,
+                timeline_start=0.5,
+                start_trim=0.0,
+                end_trim=1.5,
+            ),
+            VideoClipModel(
+                id="clip2",
+                asset_id="v2",
+                name="clip2.mp4",
+                type="video",
+                source_duration=2.0,
+                timeline_start=3.0,
+                start_trim=0.0,
+                end_trim=1.5,
+            ),
+        ],
+        export_settings=ExportSettingsModel(
+            format="mp4",
+            resolution="480p",
+            quality="medium",
+            fps=25,
+        ),
+    )
+
+    cmd = build_ffmpeg_command(manifest, {"v1": vid1, "v2": vid2}, tmp_path / "gaps.mp4")
+    cmd_str = " ".join(cmd)
+    assert "color=c=black" in cmd_str
+    assert "anullsrc=" in cmd_str
+
+    out_file = tmp_path / "rendered_gaps.mp4"
+    execute_project_render(manifest, {"v1": vid1, "v2": vid2}, out_file)
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+    meta = validate_media_file(out_file, expect_video=True, expect_audio=True)
+    assert meta["has_video"] is True
+    assert meta["has_audio"] is True
+

@@ -16,6 +16,19 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
+FFMPEG_XFADE_MAP: dict[str, str] = {
+    "fade": "fade",
+    "dissolve": "dissolve",
+    "crossfade": "fade",
+    "wipe": "wipeleft",
+    "wipe_left": "wipeleft",
+    "wipe_right": "wiperight",
+    "slide_left": "slideleft",
+    "slide_right": "slideright",
+    "zoom": "zoomin",
+    "blur": "hblur",
+}
+
 
 def compute_canvas_dimensions(manifest: VideoProjectManifest) -> Tuple[int, int]:
     res = manifest.export_settings.resolution
@@ -150,18 +163,24 @@ def build_ffmpeg_command(
     # If no clips, create a 3-second black video with silent audio
     if not manifest.clips:
         filter_chains.append(
-            f"color=c=black:s={canvas_w}x{canvas_h}:d=3:r={fps}[v_main];"
-            f"anullsrc=channel_layout=stereo:sample_rate=44100:d=3[a_main]"
+            f"color=c=black:s={canvas_w}x{canvas_h}:d=3:r={fps},fps={fps},format=yuv420p[v_main];"
+            f"anullsrc=channel_layout=stereo:sample_rate=44100:d=3,aformat=sample_rates=44100:channel_layouts=stereo[a_main]"
         )
+        last_v_tag = "[v_main]"
+        last_a_tag = "[a_main]"
     else:
+        # Sort clips by timeline_start
+        sorted_clips = sorted(manifest.clips, key=lambda c: getattr(c, "timeline_start", 0.0) or 0.0)
+
         # Process each clip
         clip_v_tags: list[str] = []
         clip_a_tags: list[str] = []
+        clip_durations: list[float] = []
 
-        for idx, clip in enumerate(manifest.clips):
+        for idx, clip in enumerate(sorted_clips):
             in_idx = asset_to_input_idx.get(clip.asset_id, 0)
-            v_tag = f"v{idx}"
-            a_tag = f"a{idx}"
+            v_tag = f"v_clip_{idx}"
+            a_tag = f"a_clip_{idx}"
 
             # Video chain
             v_filters: list[str] = []
@@ -262,7 +281,6 @@ def build_ffmpeg_command(
             if clip.opacity < 1.0 and clip.opacity >= 0:
                 v_filters.append(f"format=rgba,colorchannelmixer=aa={clip.opacity:.2f}")
 
-
             # Ensure fixed framerate and format
             v_filters.append(f"fps={fps},format=yuv420p")
 
@@ -270,7 +288,8 @@ def build_ffmpeg_command(
             clip_v_tags.append(f"[{v_tag}]")
 
             # Audio chain
-            effective_dur = max(0.1, (clip.end_trim - clip.start_trim) / max(0.1, clip.speed))
+            effective_dur = max(0.1, (clip.end_trim - clip.start_trim) / max(0.1, clip.speed or 1.0))
+            clip_durations.append(effective_dur)
             a_filters: list[str] = []
 
             if clip.type == "video" and not clip.is_muted and clip.volume > 0:
@@ -288,24 +307,114 @@ def build_ffmpeg_command(
                 if clip.fade_out_duration > 0:
                     out_start = max(0.0, effective_dur - clip.fade_out_duration)
                     a_filters.append(f"afade=t=out:st={out_start:.3f}:d={clip.fade_out_duration:.3f}")
+                a_filters.append("aformat=sample_rates=44100:channel_layouts=stereo")
                 filter_chains.append(f"[{in_idx}:a]{','.join(a_filters)}[{a_tag}]")
             else:
                 # Silent audio placeholder to ensure symmetric concat
                 filter_chains.append(
-                    f"anullsrc=channel_layout=stereo:sample_rate=44100:d={effective_dur:.3f}[{a_tag}]"
+                    f"anullsrc=channel_layout=stereo:sample_rate=44100:d={effective_dur:.3f},aformat=sample_rates=44100:channel_layouts=stereo[{a_tag}]"
                 )
 
             clip_a_tags.append(f"[{a_tag}]")
 
-        # Concat all clips into main track
-        concat_inputs = "".join(f"{v}{a}" for v, a in zip(clip_v_tags, clip_a_tags))
-        num_clips = len(manifest.clips)
-        filter_chains.append(
-            f"{concat_inputs}concat=n={num_clips}:v=1:a=1[v_concat][a_concat]"
-        )
+        # Assemble clips, gaps, and transitions along the timeline
+        initial_start = max(0.0, getattr(sorted_clips[0], "timeline_start", 0.0) or 0.0)
+        acc_idx = 0
 
-    last_v_tag = "[v_concat]" if manifest.clips else "[v_main]"
-    last_a_tag = "[a_concat]" if manifest.clips else "[a_main]"
+        if initial_start > 0.05:
+            gap_v = "[v_gap_init]"
+            gap_a = "[a_gap_init]"
+            filter_chains.append(
+                f"color=c=black:s={canvas_w}x{canvas_h}:d={initial_start:.3f}:r={fps},fps={fps},format=yuv420p{gap_v};"
+                f"anullsrc=channel_layout=stereo:sample_rate=44100:d={initial_start:.3f},aformat=sample_rates=44100:channel_layouts=stereo{gap_a}"
+            )
+            next_v = f"[v_acc_{acc_idx}]"
+            next_a = f"[a_acc_{acc_idx}]"
+            acc_idx += 1
+            filter_chains.append(
+                f"{gap_v}{gap_a}{clip_v_tags[0]}{clip_a_tags[0]}concat=n=2:v=1:a=1{next_v}{next_a}"
+            )
+            cur_v = next_v
+            cur_a = next_a
+            cur_dur = initial_start + clip_durations[0]
+        else:
+            cur_v = clip_v_tags[0]
+            cur_a = clip_a_tags[0]
+            cur_dur = clip_durations[0]
+
+        # Iterate through remaining clips
+        for i in range(len(sorted_clips) - 1):
+            clip_curr = sorted_clips[i]
+            clip_next = sorted_clips[i + 1]
+            dur_curr = clip_durations[i]
+            dur_next = clip_durations[i + 1]
+
+            start_curr = max(0.0, getattr(clip_curr, "timeline_start", 0.0) or 0.0)
+            start_next = max(0.0, getattr(clip_next, "timeline_start", 0.0) or 0.0)
+            end_curr = start_curr + dur_curr
+            gap_dur = start_next - end_curr
+
+            if gap_dur > 0.05:
+                # Insert gap segment (black video + silence)
+                gap_v = f"[v_gap_{i}]"
+                gap_a = f"[a_gap_{i}]"
+                filter_chains.append(
+                    f"color=c=black:s={canvas_w}x{canvas_h}:d={gap_dur:.3f}:r={fps},fps={fps},format=yuv420p{gap_v};"
+                    f"anullsrc=channel_layout=stereo:sample_rate=44100:d={gap_dur:.3f},aformat=sample_rates=44100:channel_layouts=stereo{gap_a}"
+                )
+                next_v = f"[v_acc_{acc_idx}]"
+                next_a = f"[a_acc_{acc_idx}]"
+                acc_idx += 1
+                filter_chains.append(
+                    f"{cur_v}{cur_a}{gap_v}{gap_a}concat=n=2:v=1:a=1{next_v}{next_a}"
+                )
+                cur_v = next_v
+                cur_a = next_a
+                cur_dur += gap_dur
+
+                # Then hard cut to next clip
+                next_v2 = f"[v_acc_{acc_idx}]"
+                next_a2 = f"[a_acc_{acc_idx}]"
+                acc_idx += 1
+                filter_chains.append(
+                    f"{cur_v}{cur_a}{clip_v_tags[i + 1]}{clip_a_tags[i + 1]}concat=n=2:v=1:a=1{next_v2}{next_a2}"
+                )
+                cur_v = next_v2
+                cur_a = next_a2
+                cur_dur += dur_next
+            else:
+                # Clips are adjacent: check for transition
+                trans = clip_curr.transition
+                if trans and trans.type in FFMPEG_XFADE_MAP and trans.type != "none" and trans.duration > 0:
+                    trans_type = FFMPEG_XFADE_MAP[trans.type]
+                    trans_dur = min(trans.duration, cur_dur * 0.8, dur_next * 0.8)
+                    offset = max(0.0, cur_dur - trans_dur)
+
+                    next_v = f"[v_xfade_{i}]"
+                    next_a = f"[a_xfade_{i}]"
+                    filter_chains.append(
+                        f"{cur_v}{clip_v_tags[i + 1]}xfade=transition={trans_type}:duration={trans_dur:.3f}:offset={offset:.3f}{next_v}"
+                    )
+                    filter_chains.append(
+                        f"{cur_a}{clip_a_tags[i + 1]}acrossfade=d={trans_dur:.3f}{next_a}"
+                    )
+                    cur_v = next_v
+                    cur_a = next_a
+                    cur_dur = offset + dur_next
+                else:
+                    # Adjacent hard cut
+                    next_v = f"[v_acc_{acc_idx}]"
+                    next_a = f"[a_acc_{acc_idx}]"
+                    acc_idx += 1
+                    filter_chains.append(
+                        f"{cur_v}{cur_a}{clip_v_tags[i + 1]}{clip_a_tags[i + 1]}concat=n=2:v=1:a=1{next_v}{next_a}"
+                    )
+                    cur_v = next_v
+                    cur_a = next_a
+                    cur_dur += dur_next
+
+        last_v_tag = cur_v
+        last_a_tag = cur_a
 
     # Apply Overlays (PIP)
     for o_idx, overlay in enumerate(manifest.overlay_layers):

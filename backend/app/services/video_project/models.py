@@ -12,7 +12,19 @@ class ProjectSettingsModel(BaseModel):
 
 
 class ClipTransitionModel(BaseModel):
-    type: Literal["none", "fade", "dissolve", "crossfade", "blur", "slide_left", "slide_right", "zoom"] = "none"
+    type: Literal[
+        "none",
+        "fade",
+        "dissolve",
+        "crossfade",
+        "wipe",
+        "wipe_left",
+        "wipe_right",
+        "slide_left",
+        "slide_right",
+        "zoom",
+        "blur",
+    ] = "none"
     duration: float = 0.5
 
 
@@ -21,6 +33,8 @@ class VideoClipModel(BaseModel):
     asset_id: str
     name: str = "Clip"
     type: Literal["video", "image"] = "video"
+    timeline_start: float = 0.0
+    track_id: str = "video_1"
     source_duration: float = 5.0
     start_trim: float = 0.0
     end_trim: float = 5.0

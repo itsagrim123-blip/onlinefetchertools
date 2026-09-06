@@ -21,10 +21,13 @@ export type TransitionType =
   | "fade"
   | "dissolve"
   | "crossfade"
-  | "blur"
+  | "wipe"
+  | "wipe_left"
+  | "wipe_right"
   | "slide_left"
   | "slide_right"
-  | "zoom";
+  | "zoom"
+  | "blur";
 
 export interface ClipTransition {
   type: TransitionType;
@@ -36,6 +39,8 @@ export interface VideoClip {
   assetId: string;
   name: string;
   type: "video" | "image";
+  timelineStart: number; // timeline time in seconds where clip starts
+  trackId?: string;      // track identifier e.g. "video_1"
   sourceDuration: number;
   startTrim: number; // seconds within the source asset
   endTrim: number;   // seconds within the source asset
@@ -96,6 +101,7 @@ export interface AudioTrackItem {
   name: string;
   sourceDuration: number;
   timelineStart: number; // timeline time when audio begins
+  trackId?: string;
   startTrim: number;
   duration: number;      // duration played on timeline
   volume: number;        // 0.0 to 2.0 (1.0 = 100%)
@@ -119,6 +125,7 @@ export interface TextLayerItem {
   id: string;
   text: string;
   timelineStart: number;
+  trackId?: string;
   duration: number;
   fontSize: number;       // in pt / px
   fontColor: string;      // hex e.g. #ffffff
@@ -141,6 +148,7 @@ export interface OverlayLayerItem {
   assetId: string;
   name: string;
   timelineStart: number;
+  trackId?: string;
   duration: number;
   scale: number;          // 0.1 to 2.0
   opacity: number;        // 0.0 to 1.0
@@ -162,6 +170,7 @@ export interface ProjectSettings {
   canvasWidth: number;
   canvasHeight: number;
   fps: number;
+  snapEnabled?: boolean;
 }
 
 export interface VideoProject {

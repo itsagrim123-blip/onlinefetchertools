@@ -7,13 +7,19 @@ import {
   VideoProject,
 } from "../types";
 
-export function createDefaultClip(asset: MediaAsset): VideoClip {
+export function createDefaultClip(
+  asset: MediaAsset,
+  timelineStart: number = 0,
+  trackId: string = "video_1"
+): VideoClip {
   const duration = asset.duration > 0 ? asset.duration : 3.0;
   return {
     id: `clip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     assetId: asset.id,
     name: asset.name,
     type: asset.type === "image" ? "image" : "video",
+    timelineStart: Math.max(0, timelineStart),
+    trackId,
     sourceDuration: duration,
     startTrim: 0,
     endTrim: duration,
@@ -113,8 +119,32 @@ export function getEffectiveClipDuration(clip: VideoClip): number {
 }
 
 export function getTotalProjectDuration(project: VideoProject): number {
-  if (!project.clips || project.clips.length === 0) return 0;
-  return project.clips.reduce((acc, clip) => acc + getEffectiveClipDuration(clip), 0);
+  let maxDuration = 0;
+  if (project.clips && project.clips.length > 0) {
+    for (const clip of project.clips) {
+      const clipEnd = (clip.timelineStart || 0) + getEffectiveClipDuration(clip);
+      if (clipEnd > maxDuration) maxDuration = clipEnd;
+    }
+  }
+  if (project.audioTracks && project.audioTracks.length > 0) {
+    for (const a of project.audioTracks) {
+      const aEnd = (a.timelineStart || 0) + a.duration;
+      if (aEnd > maxDuration) maxDuration = aEnd;
+    }
+  }
+  if (project.textLayers && project.textLayers.length > 0) {
+    for (const t of project.textLayers) {
+      const tEnd = (t.timelineStart || 0) + t.duration;
+      if (tEnd > maxDuration) maxDuration = tEnd;
+    }
+  }
+  if (project.overlayLayers && project.overlayLayers.length > 0) {
+    for (const o of project.overlayLayers) {
+      const oEnd = (o.timelineStart || 0) + o.duration;
+      if (oEnd > maxDuration) maxDuration = oEnd;
+    }
+  }
+  return maxDuration;
 }
 
 export function createInitialProject(): VideoProject {
@@ -126,6 +156,7 @@ export function createInitialProject(): VideoProject {
       canvasWidth: 1920,
       canvasHeight: 1080,
       fps: 30,
+      snapEnabled: true,
     },
     assets: [],
     clips: [],

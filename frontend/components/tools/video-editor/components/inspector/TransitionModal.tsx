@@ -12,11 +12,16 @@ interface TransitionModalProps {
 }
 
 const TRANSITIONS: { type: TransitionType; label: string; desc: string }[] = [
-  { type: "none", label: "Cut (None)", desc: "Instant transition without effect" },
-  { type: "fade", label: "Dissolve / Fade", desc: "Smooth crossfade blend between clips" },
+  { type: "none", label: "Cut (None)", desc: "Instant cut transition without effect" },
+  { type: "fade", label: "Fade / Dip to Black", desc: "Smooth black dip fade transition" },
+  { type: "dissolve", label: "Dissolve", desc: "Classic optical dissolve blend" },
+  { type: "crossfade", label: "Crossfade", desc: "Smooth crossfade blend between video & audio" },
   { type: "slide_left", label: "Slide Left", desc: "Incoming clip slides in from the right" },
   { type: "slide_right", label: "Slide Right", desc: "Incoming clip slides in from the left" },
-  { type: "zoom", label: "Zoom Cross", desc: "Zoom transition between clips" },
+  { type: "wipe_left", label: "Wipe Left", desc: "Sharp linear wipe reveal from the right" },
+  { type: "wipe_right", label: "Wipe Right", desc: "Sharp linear wipe reveal from the left" },
+  { type: "zoom", label: "Zoom Cross", desc: "Dynamic zoom transition between clips" },
+  { type: "blur", label: "Motion Blur", desc: "High-speed directional blur transition" },
 ];
 
 export function TransitionModal({

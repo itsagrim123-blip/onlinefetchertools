@@ -13,6 +13,7 @@ import {
   SidebarTab,
   TextLayerItem,
   TrackControls,
+  TransitionType,
   VideoClip,
   VideoProject,
 } from "../types";
@@ -36,31 +37,97 @@ export interface ClipTimeRange {
   duration: number;
 }
 
+export interface ActiveTransitionInfo {
+  type: TransitionType;
+  duration: number;
+  progress: number; // 0.0 to 1.0
+  fromClip: VideoClip;
+  toClip: VideoClip;
+  fromLocalTime: number;
+  toLocalTime: number;
+}
+
+export interface ActivePlaybackState {
+  activeClipInfo: (ClipTimeRange & { localSourceTime: number }) | null;
+  activeTransition: ActiveTransitionInfo | null;
+}
+
 export function computeClipTimeRanges(clips: VideoClip[]): ClipTimeRange[] {
-  let currentOffset = 0;
+  let fallbackOffset = 0;
   return clips.map((clip, index) => {
     const duration = getEffectiveClipDuration(clip);
-    const range: ClipTimeRange = {
+    const startTime = typeof clip.timelineStart === "number" ? Math.max(0, clip.timelineStart) : fallbackOffset;
+    fallbackOffset = startTime + duration;
+    return {
       clip,
       index,
-      startTime: currentOffset,
-      endTime: currentOffset + duration,
+      startTime,
+      endTime: startTime + duration,
       duration,
     };
-    currentOffset += duration;
-    return range;
   });
 }
 
-export function findClipAtTime(
+export function findPlaybackStateAtTime(
   clipRanges: ClipTimeRange[],
   time: number
-): (ClipTimeRange & { localSourceTime: number }) | null {
-  if (clipRanges.length === 0) return null;
+): ActivePlaybackState {
+  if (clipRanges.length === 0) {
+    return { activeClipInfo: null, activeTransition: null };
+  }
   const clampedTime = Math.max(0, time);
 
+  // Check for transition between adjacent clips first
+  for (let i = 0; i < clipRanges.length - 1; i++) {
+    const current = clipRanges[i];
+    const next = clipRanges[i + 1];
+    const transition = current.clip.transition;
+
+    if (transition && transition.type !== "none" && transition.duration > 0) {
+      // Adjacent if current.endTime is within 0.15s of next.startTime
+      const gap = next.startTime - current.endTime;
+      if (Math.abs(gap) <= 0.15) {
+        const transDur = Math.min(transition.duration, current.duration * 0.8, next.duration * 0.8);
+        const transStart = current.endTime - transDur;
+        const transEnd = current.endTime;
+
+        if (clampedTime >= transStart && clampedTime <= transEnd) {
+          const progress = Math.max(0, Math.min(1, (clampedTime - transStart) / transDur));
+          const elapsedA = clampedTime - current.startTime;
+          const speedA = Math.max(0.1, current.clip.speed || 1.0);
+          const localA = current.clip.isReversed
+            ? current.clip.endTrim - elapsedA * speedA
+            : current.clip.startTrim + elapsedA * speedA;
+
+          const elapsedB = clampedTime - next.startTime;
+          const speedB = Math.max(0.1, next.clip.speed || 1.0);
+          const localB = next.clip.isReversed
+            ? next.clip.endTrim - Math.max(0, elapsedB) * speedB
+            : next.clip.startTrim + Math.max(0, elapsedB) * speedB;
+
+          return {
+            activeClipInfo: {
+              ...current,
+              localSourceTime: Math.max(current.clip.startTrim, Math.min(current.clip.endTrim, localA)),
+            },
+            activeTransition: {
+              type: transition.type,
+              duration: transDur,
+              progress,
+              fromClip: current.clip,
+              toClip: next.clip,
+              fromLocalTime: Math.max(current.clip.startTrim, Math.min(current.clip.endTrim, localA)),
+              toLocalTime: Math.max(next.clip.startTrim, Math.min(next.clip.endTrim, localB)),
+            },
+          };
+        }
+      }
+    }
+  }
+
+  // Normal active clip lookup
   for (const range of clipRanges) {
-    if (clampedTime >= range.startTime && clampedTime <= range.endTime) {
+    if (clampedTime >= range.startTime && clampedTime < range.endTime) {
       const elapsedOnTimeline = clampedTime - range.startTime;
       const speed = Math.max(0.1, range.clip.speed || 1.0);
       let localSourceTime: number;
@@ -70,18 +137,37 @@ export function findClipAtTime(
         localSourceTime = range.clip.startTrim + elapsedOnTimeline * speed;
       }
       return {
-        ...range,
-        localSourceTime: Math.max(range.clip.startTrim, Math.min(range.clip.endTrim, localSourceTime)),
+        activeClipInfo: {
+          ...range,
+          localSourceTime: Math.max(range.clip.startTrim, Math.min(range.clip.endTrim, localSourceTime)),
+        },
+        activeTransition: null,
       };
     }
   }
 
-  // If time exceeds last clip, select last clip clamped to end
-  const last = clipRanges[clipRanges.length - 1];
-  return {
-    ...last,
-    localSourceTime: last.clip.isReversed ? last.clip.startTrim : last.clip.endTrim,
-  };
+  // Exact end boundary check
+  if (clipRanges.length > 0) {
+    const last = clipRanges[clipRanges.length - 1];
+    if (Math.abs(clampedTime - last.endTime) < 0.05) {
+      return {
+        activeClipInfo: {
+          ...last,
+          localSourceTime: last.clip.isReversed ? last.clip.startTrim : last.clip.endTrim,
+        },
+        activeTransition: null,
+      };
+    }
+  }
+
+  return { activeClipInfo: null, activeTransition: null };
+}
+
+export function findClipAtTime(
+  clipRanges: ClipTimeRange[],
+  time: number
+): (ClipTimeRange & { localSourceTime: number }) | null {
+  return findPlaybackStateAtTime(clipRanges, time).activeClipInfo;
 }
 
 export function useProjectState(initial?: VideoProject) {
@@ -240,12 +326,20 @@ export function useProjectState(initial?: VideoProject) {
 
   // --- Clip Operations ---
   const addClipFromAsset = useCallback(
-    (assetId: string, insertIndex?: number) => {
+    (assetId: string, insertIndex?: number, timelineStart?: number) => {
       updateProjectWithHistory((prev) => {
         const asset = prev.assets.find((a) => a.id === assetId);
         if (!asset || asset.type === "audio") return prev;
 
-        const newClip = createDefaultClip(asset);
+        let startPos = 0;
+        if (timelineStart !== undefined) {
+          startPos = Math.max(0, timelineStart);
+        } else if (prev.clips.length > 0) {
+          const lastClip = prev.clips[prev.clips.length - 1];
+          startPos = (lastClip.timelineStart || 0) + getEffectiveClipDuration(lastClip);
+        }
+
+        const newClip = createDefaultClip(asset, startPos);
         const newClips = [...prev.clips];
         if (insertIndex !== undefined && insertIndex >= 0 && insertIndex <= newClips.length) {
           newClips.splice(insertIndex, 0, newClip);
@@ -301,6 +395,7 @@ export function useProjectState(initial?: VideoProject) {
           ...orig,
           id: `clip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           name: `${orig.name} (Copy)`,
+          timelineStart: (orig.timelineStart || 0) + getEffectiveClipDuration(orig),
         };
         const newClips = [...prev.clips];
         newClips.splice(index + 1, 0, copy);
@@ -324,6 +419,43 @@ export function useProjectState(initial?: VideoProject) {
         return {
           ...prev,
           clips: result,
+        };
+      });
+    },
+    [updateProjectWithHistory]
+  );
+
+  const moveClip = useCallback(
+    (clipId: string, newTimelineStart: number) => {
+      updateProjectWithHistory((prev) => {
+        const target = prev.clips.find((c) => c.id === clipId);
+        if (!target) return prev;
+        const updated = prev.clips.map((c) =>
+          c.id === clipId ? { ...c, timelineStart: Math.max(0, newTimelineStart) } : c
+        );
+        // Sort clips so they are sequential in order of timeline appearance
+        updated.sort((a, b) => (a.timelineStart || 0) - (b.timelineStart || 0));
+
+        // Validate transitions between adjacent clips: if two clips moved apart, remove transition
+        for (let i = 0; i < updated.length; i++) {
+          const c = updated[i];
+          if (c.transition && c.transition.type !== "none") {
+            const next = updated[i + 1];
+            if (!next) {
+              c.transition = undefined;
+            } else {
+              const cEnd = (c.timelineStart || 0) + getEffectiveClipDuration(c);
+              const gap = (next.timelineStart || 0) - cEnd;
+              if (Math.abs(gap) > 0.25) {
+                c.transition = undefined;
+              }
+            }
+          }
+        }
+
+        return {
+          ...prev,
+          clips: updated,
         };
       });
     },
@@ -364,6 +496,7 @@ export function useProjectState(initial?: VideoProject) {
         const secondClip: VideoClip = {
           ...clip,
           id: `clip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          timelineStart: time,
           startTrim: splitSourceOffset,
           endTrim: clip.endTrim,
         };
@@ -383,7 +516,7 @@ export function useProjectState(initial?: VideoProject) {
   );
 
   const trimClip = useCallback(
-    (clipId: string, newStartTrim: number, newEndTrim: number) => {
+    (clipId: string, newStartTrim: number, newEndTrim: number, newTimelineStart?: number) => {
       updateProjectWithHistory((prev) => ({
         ...prev,
         clips: prev.clips.map((clip) => {
@@ -394,6 +527,7 @@ export function useProjectState(initial?: VideoProject) {
             ...clip,
             startTrim: safeStart,
             endTrim: safeEnd,
+            timelineStart: newTimelineStart !== undefined ? Math.max(0, newTimelineStart) : (clip.timelineStart || 0),
           };
         }),
       }));
@@ -517,6 +651,37 @@ export function useProjectState(initial?: VideoProject) {
     [updateProjectWithHistory]
   );
 
+  const moveAudioTrack = useCallback(
+    (trackId: string, newTimelineStart: number) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        audioTracks: prev.audioTracks.map((a) =>
+          a.id === trackId ? { ...a, timelineStart: Math.max(0, newTimelineStart) } : a
+        ),
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
+  const resizeAudioTrack = useCallback(
+    (trackId: string, newDuration: number, newStartTrim?: number, newTimelineStart?: number) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        audioTracks: prev.audioTracks.map((a) => {
+          if (a.id !== trackId) return a;
+          const duration = Math.max(0.2, newDuration);
+          return {
+            ...a,
+            duration,
+            startTrim: newStartTrim !== undefined ? Math.max(0, newStartTrim) : a.startTrim,
+            timelineStart: newTimelineStart !== undefined ? Math.max(0, newTimelineStart) : a.timelineStart,
+          };
+        }),
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
   // Extract audio from video clip into an independent audio track
   const extractAudioFromClip = useCallback(
     (clipId: string) => {
@@ -612,6 +777,35 @@ export function useProjectState(initial?: VideoProject) {
     [updateProjectWithHistory]
   );
 
+  const moveTextLayer = useCallback(
+    (layerId: string, newTimelineStart: number) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        textLayers: prev.textLayers.map((t) =>
+          t.id === layerId ? { ...t, timelineStart: Math.max(0, newTimelineStart) } : t
+        ),
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
+  const resizeTextLayer = useCallback(
+    (layerId: string, newDuration: number, newTimelineStart?: number) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        textLayers: prev.textLayers.map((t) => {
+          if (t.id !== layerId) return t;
+          return {
+            ...t,
+            duration: Math.max(0.2, newDuration),
+            timelineStart: newTimelineStart !== undefined ? Math.max(0, newTimelineStart) : t.timelineStart,
+          };
+        }),
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
   const removeTextLayer = useCallback(
     (layerId: string) => {
       updateProjectWithHistory((prev) => ({
@@ -700,6 +894,35 @@ export function useProjectState(initial?: VideoProject) {
     [updateProjectWithHistory]
   );
 
+  const moveOverlayLayer = useCallback(
+    (layerId: string, newTimelineStart: number) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        overlayLayers: prev.overlayLayers.map((o) =>
+          o.id === layerId ? { ...o, timelineStart: Math.max(0, newTimelineStart) } : o
+        ),
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
+  const resizeOverlayLayer = useCallback(
+    (layerId: string, newDuration: number, newTimelineStart?: number) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        overlayLayers: prev.overlayLayers.map((o) => {
+          if (o.id !== layerId) return o;
+          return {
+            ...o,
+            duration: Math.max(0.2, newDuration),
+            timelineStart: newTimelineStart !== undefined ? Math.max(0, newTimelineStart) : o.timelineStart,
+          };
+        }),
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
   const removeOverlayLayer = useCallback(
     (layerId: string) => {
       updateProjectWithHistory((prev) => ({
@@ -710,6 +933,16 @@ export function useProjectState(initial?: VideoProject) {
     },
     [selectedOverlayId, updateProjectWithHistory]
   );
+
+  const toggleSnap = useCallback(() => {
+    updateProjectWithHistory((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        snapEnabled: !(prev.settings.snapEnabled ?? true),
+      },
+    }));
+  }, [updateProjectWithHistory]);
 
   // --- Project Settings ---
   const setAspectRatio = useCallback(
@@ -844,6 +1077,7 @@ export function useProjectState(initial?: VideoProject) {
     removeClip,
     duplicateClip,
     reorderClips,
+    moveClip,
     splitClipAtTime,
     trimClip,
     insertFreezeFrame,
@@ -851,16 +1085,23 @@ export function useProjectState(initial?: VideoProject) {
     updateAudioTrack,
     removeAudioTrack,
     duplicateAudioTrack,
+    moveAudioTrack,
+    resizeAudioTrack,
     extractAudioFromClip,
     addTextLayer,
     updateTextLayer,
     removeTextLayer,
     duplicateTextLayer,
+    moveTextLayer,
+    resizeTextLayer,
     addAutoCaptions,
     addOverlayLayer,
     updateOverlayLayer,
     removeOverlayLayer,
     duplicateOverlayLayer,
+    moveOverlayLayer,
+    resizeOverlayLayer,
+    toggleSnap,
     setAspectRatio,
     setProjectTitle,
   };

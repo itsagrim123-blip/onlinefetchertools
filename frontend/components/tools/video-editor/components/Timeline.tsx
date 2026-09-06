@@ -6,8 +6,10 @@ import {
   Eye,
   EyeOff,
   Film,
+  GripVertical,
   Layers,
   Lock,
+  Magnet,
   Maximize2,
   Minus,
   Plus,
@@ -48,7 +50,14 @@ interface TimelineProps {
   onSelectText: (id: string | null) => void;
   onSelectOverlay: (id: string | null) => void;
   onSplit: (time: number) => void;
-  onTrimClip: (clipId: string, startTrim: number, endTrim: number) => void;
+  onTrimClip: (clipId: string, startTrim: number, endTrim: number, newTimelineStart?: number) => void;
+  onMoveClip?: (clipId: string, newTimelineStart: number) => void;
+  onMoveAudio?: (audioId: string, newTimelineStart: number) => void;
+  onResizeAudio?: (audioId: string, newDuration: number, newStartTrim?: number, newTimelineStart?: number) => void;
+  onMoveText?: (textId: string, newTimelineStart: number) => void;
+  onResizeText?: (textId: string, newDuration: number, newTimelineStart?: number) => void;
+  onMoveOverlay?: (overlayId: string, newTimelineStart: number) => void;
+  onResizeOverlay?: (overlayId: string, newDuration: number, newTimelineStart?: number) => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onUndo: () => void;
@@ -57,16 +66,348 @@ interface TimelineProps {
   onOpenTransitionModal?: (clipId: string) => void;
   onToggleTrackVisibility?: (track: "video" | "audio" | "text" | "overlay") => void;
   onToggleTrackLock?: (track: "video" | "audio" | "text" | "overlay") => void;
+  onToggleSnap?: () => void;
   onAddMediaClick?: () => void;
   hideTopToolbar?: boolean;
 }
 
+function snapValue(time: number, points: number[], threshold: number, enabled: boolean): number {
+  if (!enabled || points.length === 0) return Math.max(0, time);
+  let best = Math.max(0, time);
+  let minDiff = threshold;
+  for (const pt of points) {
+    const diff = Math.abs(time - pt);
+    if (diff < minDiff) {
+      minDiff = diff;
+      best = pt;
+    }
+  }
+  return Math.max(0, best);
+}
+
+// --- Text Track Item with Drag & Left/Right Resize Handles ---
+const TimelineTextTrackItem = memo(function TimelineTextTrackItem({
+  textItem,
+  zoom,
+  isSelected,
+  isTextLocked,
+  snapPoints = [],
+  snapEnabled = true,
+  onSelect,
+  onMove,
+  onResize,
+}: {
+  textItem: TextLayerItem;
+  zoom: number;
+  isSelected: boolean;
+  isTextLocked: boolean;
+  snapPoints?: number[];
+  snapEnabled?: boolean;
+  onSelect: () => void;
+  onMove?: (newStart: number) => void;
+  onResize?: (newDur: number, newStart?: number) => void;
+}) {
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragOffsetPx, setDragOffsetPx] = useState<number>(0);
+  const startXRef = useRef<number>(0);
+  const movedRef = useRef<boolean>(false);
+
+  const [resizingSide, setResizingSide] = useState<"start" | "end" | null>(null);
+  const resizeStartXRef = useRef<number>(0);
+  const initialDurRef = useRef<number>(textItem.duration);
+  const initialStartRef = useRef<number>(textItem.timelineStart);
+
+  // Body move
+  const handleBodyPointerDown = (e: React.PointerEvent) => {
+    if (isTextLocked || e.button !== 0) return;
+    startXRef.current = e.clientX;
+    movedRef.current = false;
+    setIsDragging(true);
+    setDragOffsetPx(0);
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleBodyPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const delta = e.clientX - startXRef.current;
+    if (Math.abs(delta) > 3) movedRef.current = true;
+    setDragOffsetPx(delta);
+  };
+
+  const handleBodyPointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(false);
+    if (movedRef.current && onMove) {
+      const deltaSec = dragOffsetPx / zoom;
+      const raw = Math.max(0, textItem.timelineStart + deltaSec);
+      const otherPoints = snapPoints.filter((p) => Math.abs(p - textItem.timelineStart) > 0.05);
+      const snapped = snapValue(raw, otherPoints, 12 / zoom, snapEnabled);
+      onMove(snapped);
+    } else {
+      onSelect();
+    }
+    setDragOffsetPx(0);
+  };
+
+  // Resize handles
+  const handleResizeStart = (e: React.PointerEvent, side: "start" | "end") => {
+    e.stopPropagation();
+    if (isTextLocked || e.button !== 0) return;
+    setResizingSide(side);
+    resizeStartXRef.current = e.clientX;
+    initialDurRef.current = textItem.duration;
+    initialStartRef.current = textItem.timelineStart;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleResizeMove = (e: React.PointerEvent) => {
+    if (!resizingSide || !onResize) return;
+    const deltaPx = e.clientX - resizeStartXRef.current;
+    const deltaSec = deltaPx / zoom;
+
+    if (resizingSide === "end") {
+      const newDur = Math.max(0.3, initialDurRef.current + deltaSec);
+      onResize(newDur);
+    } else {
+      const newStart = Math.max(0, initialStartRef.current + deltaSec);
+      const newDur = Math.max(0.3, initialDurRef.current - deltaSec);
+      onResize(newDur, newStart);
+    }
+  };
+
+  const handleResizeUp = (e: React.PointerEvent) => {
+    if (!resizingSide) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setResizingSide(null);
+  };
+
+  const leftPx = Math.max(0, textItem.timelineStart * zoom + (isDragging ? dragOffsetPx : 0));
+  const widthPx = Math.max(36, textItem.duration * zoom);
+
+  return (
+    <div
+      onPointerDown={handleBodyPointerDown}
+      onPointerMove={handleBodyPointerMove}
+      onPointerUp={handleBodyPointerUp}
+      style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
+      className={`absolute h-7 cursor-grab rounded-lg border px-1.5 text-[11px] font-medium flex items-center justify-between select-none group transition-shadow ${
+        isSelected
+          ? "border-cyan-400 bg-cyan-500/35 text-white ring-1 ring-cyan-400 shadow-md shadow-cyan-950/40 z-20"
+          : "border-cyan-400/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 z-10"
+      } ${isTextLocked ? "cursor-not-allowed opacity-60" : ""} ${isDragging ? "cursor-grabbing opacity-90 shadow-xl" : ""}`}
+      title={textItem.text}
+    >
+      {/* Left Resize Handle */}
+      {!isTextLocked && (
+        <div
+          onPointerDown={(e) => handleResizeStart(e, "start")}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize flex items-center justify-center rounded-l-lg hover:bg-cyan-300/30 transition opacity-0 group-hover:opacity-100 z-30"
+          title="Drag to adjust start"
+        >
+          <div className="w-0.5 h-3 bg-cyan-300 rounded-full" />
+        </div>
+      )}
+
+      <div className="flex items-center min-w-0 truncate px-1 pointer-events-none">
+        <Type className="h-3 w-3 mr-1 shrink-0 text-cyan-300" />
+        <span className="truncate">{textItem.text}</span>
+      </div>
+      <span className="text-[9px] font-mono text-cyan-300/80 shrink-0 pointer-events-none">
+        {textItem.duration.toFixed(1)}s
+      </span>
+
+      {/* Right Resize Handle */}
+      {!isTextLocked && (
+        <div
+          onPointerDown={(e) => handleResizeStart(e, "end")}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize flex items-center justify-center rounded-r-lg hover:bg-cyan-300/30 transition opacity-0 group-hover:opacity-100 z-30"
+          title="Drag to extend duration"
+        >
+          <div className="w-0.5 h-3 bg-cyan-300 rounded-full" />
+        </div>
+      )}
+    </div>
+  );
+});
+
+// --- Overlay Track Item with Drag & Left/Right Resize Handles ---
+const TimelineOverlayTrackItem = memo(function TimelineOverlayTrackItem({
+  overlay,
+  zoom,
+  isSelected,
+  isOverlayLocked,
+  snapPoints = [],
+  snapEnabled = true,
+  onSelect,
+  onMove,
+  onResize,
+}: {
+  overlay: OverlayLayerItem;
+  zoom: number;
+  isSelected: boolean;
+  isOverlayLocked: boolean;
+  snapPoints?: number[];
+  snapEnabled?: boolean;
+  onSelect: () => void;
+  onMove?: (newStart: number) => void;
+  onResize?: (newDur: number, newStart?: number) => void;
+}) {
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragOffsetPx, setDragOffsetPx] = useState<number>(0);
+  const startXRef = useRef<number>(0);
+  const movedRef = useRef<boolean>(false);
+
+  const [resizingSide, setResizingSide] = useState<"start" | "end" | null>(null);
+  const resizeStartXRef = useRef<number>(0);
+  const initialDurRef = useRef<number>(overlay.duration);
+  const initialStartRef = useRef<number>(overlay.timelineStart);
+
+  const handleBodyPointerDown = (e: React.PointerEvent) => {
+    if (isOverlayLocked || e.button !== 0) return;
+    startXRef.current = e.clientX;
+    movedRef.current = false;
+    setIsDragging(true);
+    setDragOffsetPx(0);
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleBodyPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const delta = e.clientX - startXRef.current;
+    if (Math.abs(delta) > 3) movedRef.current = true;
+    setDragOffsetPx(delta);
+  };
+
+  const handleBodyPointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(false);
+    if (movedRef.current && onMove) {
+      const deltaSec = dragOffsetPx / zoom;
+      const raw = Math.max(0, overlay.timelineStart + deltaSec);
+      const otherPoints = snapPoints.filter((p) => Math.abs(p - overlay.timelineStart) > 0.05);
+      const snapped = snapValue(raw, otherPoints, 12 / zoom, snapEnabled);
+      onMove(snapped);
+    } else {
+      onSelect();
+    }
+    setDragOffsetPx(0);
+  };
+
+  const handleResizeStart = (e: React.PointerEvent, side: "start" | "end") => {
+    e.stopPropagation();
+    if (isOverlayLocked || e.button !== 0) return;
+    setResizingSide(side);
+    resizeStartXRef.current = e.clientX;
+    initialDurRef.current = overlay.duration;
+    initialStartRef.current = overlay.timelineStart;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleResizeMove = (e: React.PointerEvent) => {
+    if (!resizingSide || !onResize) return;
+    const deltaPx = e.clientX - resizeStartXRef.current;
+    const deltaSec = deltaPx / zoom;
+
+    if (resizingSide === "end") {
+      const newDur = Math.max(0.3, initialDurRef.current + deltaSec);
+      onResize(newDur);
+    } else {
+      const newStart = Math.max(0, initialStartRef.current + deltaSec);
+      const newDur = Math.max(0.3, initialDurRef.current - deltaSec);
+      onResize(newDur, newStart);
+    }
+  };
+
+  const handleResizeUp = (e: React.PointerEvent) => {
+    if (!resizingSide) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setResizingSide(null);
+  };
+
+  const leftPx = Math.max(0, overlay.timelineStart * zoom + (isDragging ? dragOffsetPx : 0));
+  const widthPx = Math.max(36, overlay.duration * zoom);
+
+  return (
+    <div
+      onPointerDown={handleBodyPointerDown}
+      onPointerMove={handleBodyPointerMove}
+      onPointerUp={handleBodyPointerUp}
+      style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
+      className={`absolute h-7 cursor-grab rounded-lg border px-1.5 text-[11px] font-medium flex items-center justify-between select-none group transition-shadow ${
+        isSelected
+          ? "border-amber-400 bg-amber-500/35 text-white ring-1 ring-amber-400 shadow-md shadow-amber-950/40 z-20"
+          : "border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 z-10"
+      } ${isOverlayLocked ? "cursor-not-allowed opacity-60" : ""} ${isDragging ? "cursor-grabbing opacity-90 shadow-xl" : ""}`}
+      title={overlay.name}
+    >
+      {!isOverlayLocked && (
+        <div
+          onPointerDown={(e) => handleResizeStart(e, "start")}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize flex items-center justify-center rounded-l-lg hover:bg-amber-300/30 transition opacity-0 group-hover:opacity-100 z-30"
+          title="Drag to adjust start"
+        >
+          <div className="w-0.5 h-3 bg-amber-300 rounded-full" />
+        </div>
+      )}
+
+      <div className="flex items-center min-w-0 truncate px-1 pointer-events-none">
+        <Layers className="h-3 w-3 mr-1 shrink-0 text-amber-300" />
+        <span className="truncate">{overlay.name}</span>
+      </div>
+      <span className="text-[9px] font-mono text-amber-300/80 shrink-0 pointer-events-none">
+        {overlay.duration.toFixed(1)}s
+      </span>
+
+      {!isOverlayLocked && (
+        <div
+          onPointerDown={(e) => handleResizeStart(e, "end")}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize flex items-center justify-center rounded-r-lg hover:bg-amber-300/30 transition opacity-0 group-hover:opacity-100 z-30"
+          title="Drag to extend duration"
+        >
+          <div className="w-0.5 h-3 bg-amber-300 rounded-full" />
+        </div>
+      )}
+    </div>
+  );
+});
+
+// --- Audio Track Item with Drag & Left/Right Resize Handles ---
 interface TimelineAudioTrackItemProps {
   audio: AudioTrackItem;
   zoom: number;
   isSelected: boolean;
   isAudioLocked: boolean;
+  snapPoints?: number[];
+  snapEnabled?: boolean;
   onSelect: () => void;
+  onMove?: (newStart: number) => void;
+  onResize?: (newDur: number, newStartTrim?: number, newTimelineStart?: number) => void;
 }
 
 const TimelineAudioTrackItem = memo(function TimelineAudioTrackItem({
@@ -74,13 +415,100 @@ const TimelineAudioTrackItem = memo(function TimelineAudioTrackItem({
   zoom,
   isSelected,
   isAudioLocked,
+  snapPoints = [],
+  snapEnabled = true,
   onSelect,
+  onMove,
+  onResize,
 }: TimelineAudioTrackItemProps) {
-  const leftPx = audio.timelineStart * zoom;
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragOffsetPx, setDragOffsetPx] = useState<number>(0);
+  const startXRef = useRef<number>(0);
+  const movedRef = useRef<boolean>(false);
+
+  const [resizingSide, setResizingSide] = useState<"start" | "end" | null>(null);
+  const resizeStartXRef = useRef<number>(0);
+  const initialDurRef = useRef<number>(audio.duration);
+  const initialStartRef = useRef<number>(audio.timelineStart);
+  const initialTrimRef = useRef<number>(audio.startTrim);
+
+  const handleBodyPointerDown = (e: React.PointerEvent) => {
+    if (isAudioLocked || e.button !== 0) return;
+    startXRef.current = e.clientX;
+    movedRef.current = false;
+    setIsDragging(true);
+    setDragOffsetPx(0);
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleBodyPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const delta = e.clientX - startXRef.current;
+    if (Math.abs(delta) > 3) movedRef.current = true;
+    setDragOffsetPx(delta);
+  };
+
+  const handleBodyPointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(false);
+    if (movedRef.current && onMove) {
+      const deltaSec = dragOffsetPx / zoom;
+      const raw = Math.max(0, audio.timelineStart + deltaSec);
+      const otherPoints = snapPoints.filter((p) => Math.abs(p - audio.timelineStart) > 0.05);
+      const snapped = snapValue(raw, otherPoints, 12 / zoom, snapEnabled);
+      onMove(snapped);
+    } else {
+      onSelect();
+    }
+    setDragOffsetPx(0);
+  };
+
+  const handleResizeStart = (e: React.PointerEvent, side: "start" | "end") => {
+    e.stopPropagation();
+    if (isAudioLocked || e.button !== 0) return;
+    setResizingSide(side);
+    resizeStartXRef.current = e.clientX;
+    initialDurRef.current = audio.duration;
+    initialStartRef.current = audio.timelineStart;
+    initialTrimRef.current = audio.startTrim;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleResizeMove = (e: React.PointerEvent) => {
+    if (!resizingSide || !onResize) return;
+    const deltaPx = e.clientX - resizeStartXRef.current;
+    const deltaSec = deltaPx / zoom;
+
+    if (resizingSide === "end") {
+      const newDur = Math.max(0.3, Math.min(audio.sourceDuration - audio.startTrim, initialDurRef.current + deltaSec));
+      onResize(newDur);
+    } else {
+      const newTrim = Math.max(0, initialTrimRef.current + deltaSec);
+      const newStart = Math.max(0, initialStartRef.current + deltaSec);
+      const newDur = Math.max(0.3, initialDurRef.current - deltaSec);
+      onResize(newDur, newTrim, newStart);
+    }
+  };
+
+  const handleResizeUp = (e: React.PointerEvent) => {
+    if (!resizingSide) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setResizingSide(null);
+  };
+
+  const leftPx = Math.max(0, audio.timelineStart * zoom + (isDragging ? dragOffsetPx : 0));
   const widthPx = Math.max(40, audio.duration * zoom);
   const barCount = Math.max(6, Math.floor(widthPx / 5));
 
-  // Memoize waveform bars so array and JSX are only computed when width changes
   const waveformBars = useMemo(() => {
     return Array.from({ length: barCount }, (_, bIdx) => {
       const h = 20 + ((bIdx * 17) % 65);
@@ -96,30 +524,53 @@ const TimelineAudioTrackItem = memo(function TimelineAudioTrackItem({
 
   return (
     <div
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!isAudioLocked) onSelect();
-      }}
+      onPointerDown={handleBodyPointerDown}
+      onPointerMove={handleBodyPointerMove}
+      onPointerUp={handleBodyPointerUp}
       style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
-      className={`absolute h-8 cursor-pointer rounded-lg border px-2 text-[11px] font-medium truncate flex items-center justify-between transition overflow-hidden ${
+      className={`absolute h-8 cursor-grab rounded-lg border px-2 text-[11px] font-medium flex items-center justify-between select-none group transition-shadow overflow-hidden ${
         isSelected
-          ? "border-purple-400 bg-purple-500/30 text-white ring-1 ring-purple-400"
-          : "border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20"
-      } ${isAudioLocked ? "cursor-not-allowed opacity-60" : ""}`}
+          ? "border-purple-400 bg-purple-500/30 text-white ring-1 ring-purple-400 shadow-lg shadow-purple-950/50 z-20"
+          : "border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 z-10"
+      } ${isAudioLocked ? "cursor-not-allowed opacity-60" : ""} ${isDragging ? "cursor-grabbing opacity-90 shadow-xl" : ""}`}
       title={audio.name}
     >
+      {!isAudioLocked && (
+        <div
+          onPointerDown={(e) => handleResizeStart(e, "start")}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize flex items-center justify-center rounded-l-lg hover:bg-purple-300/30 transition opacity-0 group-hover:opacity-100 z-30"
+          title="Drag to trim audio start"
+        >
+          <div className="w-0.5 h-4 bg-purple-300 rounded-full" />
+        </div>
+      )}
+
       {/* Simulated Waveform background */}
       <div className="absolute inset-0 flex items-center justify-around px-1 opacity-20 pointer-events-none">
         {waveformBars}
       </div>
 
-      <div className="relative z-10 flex items-center min-w-0 truncate">
+      <div className="relative z-10 flex items-center min-w-0 truncate pointer-events-none">
         <Volume2 className="h-3 w-3 mr-1 shrink-0 text-purple-300" />
         <span className="truncate">{audio.name}</span>
       </div>
-      <span className="relative z-10 text-[10px] font-mono text-purple-300 ml-1 shrink-0">
-        {Math.round(audio.volume * 100)}%
+      <span className="relative z-10 text-[10px] font-mono text-purple-300 ml-1 shrink-0 pointer-events-none">
+        {audio.duration.toFixed(1)}s
       </span>
+
+      {!isAudioLocked && (
+        <div
+          onPointerDown={(e) => handleResizeStart(e, "end")}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize flex items-center justify-center rounded-r-lg hover:bg-purple-300/30 transition opacity-0 group-hover:opacity-100 z-30"
+          title="Drag to extend audio duration"
+        >
+          <div className="w-0.5 h-4 bg-purple-300 rounded-full" />
+        </div>
+      )}
     </div>
   );
 });
@@ -142,6 +593,13 @@ export const Timeline = memo(function Timeline({
   onSelectOverlay,
   onSplit,
   onTrimClip,
+  onMoveClip,
+  onMoveAudio,
+  onResizeAudio,
+  onMoveText,
+  onResizeText,
+  onMoveOverlay,
+  onResizeOverlay,
   onDuplicate,
   onDelete,
   onUndo,
@@ -150,11 +608,31 @@ export const Timeline = memo(function Timeline({
   onOpenTransitionModal,
   onToggleTrackVisibility,
   onToggleTrackLock,
+  onToggleSnap,
   onAddMediaClick,
   hideTopToolbar = false,
 }: TimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
+
+  const snapPoints = useMemo(() => {
+    const pts: number[] = [0, currentTime];
+    project.clips.forEach((c) => {
+      const start = c.timelineStart || 0;
+      const end = start + getEffectiveClipDuration(c);
+      pts.push(start, end);
+    });
+    project.audioTracks.forEach((a) => {
+      pts.push(a.timelineStart, a.timelineStart + a.duration);
+    });
+    project.textLayers.forEach((t) => {
+      pts.push(t.timelineStart, t.timelineStart + t.duration);
+    });
+    project.overlayLayers.forEach((o) => {
+      pts.push(o.timelineStart, o.timelineStart + o.duration);
+    });
+    return Array.from(new Set(pts)).sort((a, b) => a - b);
+  }, [project, currentTime]);
 
   const trackControls: TrackControls = project.trackControls || {
     video: { visible: true, locked: false },
@@ -306,6 +784,22 @@ export const Timeline = memo(function Timeline({
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
+
+            {onToggleSnap && (
+              <button
+                type="button"
+                onClick={onToggleSnap}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition ${
+                  project.settings.snapEnabled ?? true
+                    ? "border-cyan-400 bg-cyan-400/20 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.2)]"
+                    : "border-white/10 bg-white/5 text-slate-400 hover:text-white"
+                }`}
+                title="Toggle Magnet / Snapping"
+              >
+                <Magnet className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Snap</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -547,66 +1041,54 @@ export const Timeline = memo(function Timeline({
 
             {/* Track 1: Text Layers Track */}
             <div
-              className={`relative flex h-10 w-full items-center border-b border-white/5 px-1 py-1 ${
+              className={`relative h-10 w-full border-b border-white/5 px-1 py-1 ${
                 !isTextVisible ? "opacity-30 pointer-events-none" : ""
               }`}
             >
-              {project.textLayers.map((textItem) => {
-                const leftPx = textItem.timelineStart * zoom;
-                const widthPx = Math.max(40, textItem.duration * zoom);
-                const isSelected = selectedTextId === textItem.id;
-                return (
-                  <div
-                    key={textItem.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isTextLocked) onSelectText(textItem.id);
-                    }}
-                    style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
-                    className={`absolute h-7 cursor-pointer rounded-lg border px-2 text-[11px] font-medium truncate flex items-center transition ${
-                      isSelected
-                        ? "border-cyan-400 bg-cyan-500/30 text-white ring-1 ring-cyan-400"
-                        : "border-cyan-400/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
-                    } ${isTextLocked ? "cursor-not-allowed opacity-60" : ""}`}
-                    title={textItem.text}
-                  >
-                    <Type className="h-3 w-3 mr-1 shrink-0 text-cyan-300" />
-                    <span className="truncate">{textItem.text}</span>
-                  </div>
-                );
-              })}
+              {project.textLayers.map((textItem) => (
+                <TimelineTextTrackItem
+                  key={textItem.id}
+                  textItem={textItem}
+                  zoom={zoom}
+                  isSelected={selectedTextId === textItem.id}
+                  isTextLocked={isTextLocked}
+                  snapPoints={snapPoints}
+                  snapEnabled={project.settings.snapEnabled ?? true}
+                  onSelect={() => onSelectText(textItem.id)}
+                  onMove={(newStart) => {
+                    if (!isTextLocked && onMoveText) onMoveText(textItem.id, newStart);
+                  }}
+                  onResize={(newDur, newStart) => {
+                    if (!isTextLocked && onResizeText) onResizeText(textItem.id, newDur, newStart);
+                  }}
+                />
+              ))}
             </div>
 
             {/* Track 2: Overlays (PIP) Track */}
             <div
-              className={`relative flex h-10 w-full items-center border-b border-white/5 px-1 py-1 ${
+              className={`relative h-10 w-full border-b border-white/5 px-1 py-1 ${
                 !isOverlayVisible ? "opacity-30 pointer-events-none" : ""
               }`}
             >
-              {project.overlayLayers.map((overlay) => {
-                const leftPx = overlay.timelineStart * zoom;
-                const widthPx = Math.max(40, overlay.duration * zoom);
-                const isSelected = selectedOverlayId === overlay.id;
-                return (
-                  <div
-                    key={overlay.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isOverlayLocked) onSelectOverlay(overlay.id);
-                    }}
-                    style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
-                    className={`absolute h-7 cursor-pointer rounded-lg border px-2 text-[11px] font-medium truncate flex items-center transition ${
-                      isSelected
-                        ? "border-amber-400 bg-amber-500/30 text-white ring-1 ring-amber-400"
-                        : "border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
-                    } ${isOverlayLocked ? "cursor-not-allowed opacity-60" : ""}`}
-                    title={overlay.name}
-                  >
-                    <Layers className="h-3 w-3 mr-1 shrink-0 text-amber-300" />
-                    <span className="truncate">{overlay.name}</span>
-                  </div>
-                );
-              })}
+              {project.overlayLayers.map((overlay) => (
+                <TimelineOverlayTrackItem
+                  key={overlay.id}
+                  overlay={overlay}
+                  zoom={zoom}
+                  isSelected={selectedOverlayId === overlay.id}
+                  isOverlayLocked={isOverlayLocked}
+                  snapPoints={snapPoints}
+                  snapEnabled={project.settings.snapEnabled ?? true}
+                  onSelect={() => onSelectOverlay(overlay.id)}
+                  onMove={(newStart) => {
+                    if (!isOverlayLocked && onMoveOverlay) onMoveOverlay(overlay.id, newStart);
+                  }}
+                  onResize={(newDur, newStart) => {
+                    if (!isOverlayLocked && onResizeOverlay) onResizeOverlay(overlay.id, newDur, newStart);
+                  }}
+                />
+              ))}
             </div>
 
             {/* Track 3: Main Video Track */}
@@ -616,7 +1098,7 @@ export const Timeline = memo(function Timeline({
                 const clickX = e.clientX - rect.left;
                 onSeek(Math.max(0, clickX / zoom));
               }}
-              className={`relative flex min-h-[72px] w-full items-center border-b border-white/5 px-1 py-2 bg-slate-900/30 ${
+              className={`relative h-[72px] w-full border-b border-white/5 px-1 py-2 bg-slate-900/30 ${
                 !isVideoVisible ? "opacity-30" : ""
               }`}
             >
@@ -625,49 +1107,67 @@ export const Timeline = memo(function Timeline({
                   Main track empty. Add video or image clips from Project Media.
                 </div>
               ) : (
-                <div className="flex items-center">
-                  {project.clips.map((clip, idx) => (
-                    <TimelineClipItem
-                      key={clip.id}
-                      clip={clip}
-                      index={idx}
-                      zoom={zoom}
-                      isSelected={selectedClipId === clip.id}
-                      onSelect={() => {
-                        if (!isVideoLocked) onSelectClip(clip.id);
-                      }}
-                      onTrim={(start, end) => {
-                        if (!isVideoLocked) onTrimClip(clip.id, start, end);
-                      }}
-                      onOpenTransitionModal={
-                        onOpenTransitionModal ? () => onOpenTransitionModal(clip.id) : undefined
-                      }
-                      isLastClip={idx === project.clips.length - 1}
-                    />
-                  ))}
+                <>
+                  {project.clips.map((clip, idx) => {
+                    const nextClip = project.clips[idx + 1];
+                    const clipEnd = (clip.timelineStart || 0) + getEffectiveClipDuration(clip);
+                    const isAdjacent = nextClip && Math.abs((nextClip.timelineStart || 0) - clipEnd) <= 0.2;
+                    return (
+                      <TimelineClipItem
+                        key={clip.id}
+                        clip={clip}
+                        index={idx}
+                        zoom={zoom}
+                        snapPoints={snapPoints}
+                        snapEnabled={project.settings.snapEnabled ?? true}
+                        isSelected={selectedClipId === clip.id}
+                        onSelect={() => {
+                          if (!isVideoLocked) onSelectClip(clip.id);
+                        }}
+                        onMove={(newStart) => {
+                          if (!isVideoLocked && onMoveClip) onMoveClip(clip.id, newStart);
+                        }}
+                        onTrim={(start, end, newStart) => {
+                          if (!isVideoLocked) onTrimClip(clip.id, start, end, newStart);
+                        }}
+                        onOpenTransitionModal={
+                          onOpenTransitionModal ? () => onOpenTransitionModal(clip.id) : undefined
+                        }
+                        isAdjacentToNext={Boolean(isAdjacent)}
+                      />
+                    );
+                  })}
 
                   {/* + Add clip button at end of video track */}
                   {onAddMediaClick && (
                     <button
                       type="button"
+                      style={{
+                        left: `${
+                          project.clips.reduce(
+                            (max, c) => Math.max(max, (c.timelineStart || 0) + getEffectiveClipDuration(c)),
+                            0
+                          ) * zoom + 12
+                        }px`,
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddMediaClick();
                       }}
-                      className="ml-2 h-14 w-12 rounded-xl border border-dashed border-white/20 hover:border-cyan-400 bg-white/5 hover:bg-cyan-400/10 flex flex-col items-center justify-center text-slate-400 hover:text-cyan-300 transition shrink-0"
+                      className="absolute top-2 h-14 w-12 rounded-xl border border-dashed border-white/20 hover:border-cyan-400 bg-white/5 hover:bg-cyan-400/10 flex flex-col items-center justify-center text-slate-400 hover:text-cyan-300 transition shrink-0 z-10"
                       title="Add Media / Clip to Track"
                     >
                       <Plus className="h-4 w-4 mb-0.5" />
                       <span className="text-[9px] font-semibold">Add</span>
                     </button>
                   )}
-                </div>
+                </>
               )}
             </div>
 
             {/* Track 4: Audio / Music Track */}
             <div
-              className={`relative flex h-11 w-full items-center px-1 py-1 bg-purple-950/10 ${
+              className={`relative h-11 w-full px-1 py-1 bg-purple-950/10 ${
                 !isAudioVisible ? "opacity-30" : ""
               }`}
             >
@@ -678,7 +1178,15 @@ export const Timeline = memo(function Timeline({
                   zoom={zoom}
                   isSelected={selectedAudioId === audio.id}
                   isAudioLocked={isAudioLocked}
+                  snapPoints={snapPoints}
+                  snapEnabled={project.settings.snapEnabled ?? true}
                   onSelect={() => onSelectAudio(audio.id)}
+                  onMove={(newStart) => {
+                    if (!isAudioLocked && onMoveAudio) onMoveAudio(audio.id, newStart);
+                  }}
+                  onResize={(newDur, newTrim, newStart) => {
+                    if (!isAudioLocked && onResizeAudio) onResizeAudio(audio.id, newDur, newTrim, newStart);
+                  }}
                 />
               ))}
             </div>

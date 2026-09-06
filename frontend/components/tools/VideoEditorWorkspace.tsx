@@ -98,6 +98,14 @@ export function VideoEditorWorkspace() {
     updateOverlayLayer,
     removeOverlayLayer,
     duplicateOverlayLayer,
+    moveClip,
+    moveAudioTrack,
+    resizeAudioTrack,
+    moveTextLayer,
+    resizeTextLayer,
+    moveOverlayLayer,
+    resizeOverlayLayer,
+    toggleSnap,
     setAspectRatio,
     setProjectTitle,
   } = useProjectState();
@@ -239,6 +247,8 @@ export function VideoEditorWorkspace() {
         asset_id: c.assetId,
         name: c.name,
         type: c.type,
+        timeline_start: c.timelineStart,
+        track_id: c.trackId || "video_1",
         source_duration: c.sourceDuration,
         start_trim: c.startTrim,
         end_trim: c.endTrim,
@@ -281,6 +291,7 @@ export function VideoEditorWorkspace() {
         name: a.name,
         source_duration: a.sourceDuration,
         timeline_start: a.timelineStart,
+        track_id: a.trackId || "audio_1",
         start_trim: a.startTrim,
         duration: a.duration,
         volume: a.volume,
@@ -294,6 +305,7 @@ export function VideoEditorWorkspace() {
         id: t.id,
         text: t.text,
         timeline_start: t.timelineStart,
+        track_id: t.trackId || "text_1",
         duration: t.duration,
         font_size: t.fontSize,
         font_color: t.fontColor,
@@ -315,6 +327,7 @@ export function VideoEditorWorkspace() {
         asset_id: o.assetId,
         name: o.name,
         timeline_start: o.timelineStart,
+        track_id: o.trackId || "overlay_1",
         duration: o.duration,
         scale: o.scale,
         opacity: o.opacity,
@@ -656,6 +669,14 @@ export function VideoEditorWorkspace() {
               onToggleTrackVisibility={toggleTrackVisibility}
               onToggleTrackLock={toggleTrackLock}
               onAddMediaClick={handleAddMediaClick}
+              onMoveClip={moveClip}
+              onMoveAudio={moveAudioTrack}
+              onResizeAudio={resizeAudioTrack}
+              onMoveText={moveTextLayer}
+              onResizeText={resizeTextLayer}
+              onMoveOverlay={moveOverlayLayer}
+              onResizeOverlay={resizeOverlayLayer}
+              onToggleSnap={toggleSnap}
               hideTopToolbar={true}
             />
           </div>
@@ -752,6 +773,14 @@ export function VideoEditorWorkspace() {
               onToggleTrackVisibility={toggleTrackVisibility}
               onToggleTrackLock={toggleTrackLock}
               onAddMediaClick={handleMobileAddMedia}
+              onMoveClip={moveClip}
+              onMoveAudio={moveAudioTrack}
+              onResizeAudio={resizeAudioTrack}
+              onMoveText={moveTextLayer}
+              onResizeText={resizeTextLayer}
+              onMoveOverlay={moveOverlayLayer}
+              onResizeOverlay={resizeOverlayLayer}
+              onToggleSnap={toggleSnap}
               hideTopToolbar={true}
             />
           </div>

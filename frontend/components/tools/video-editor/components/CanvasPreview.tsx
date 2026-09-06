@@ -20,12 +20,110 @@ import {
   MediaAsset,
   OverlayLayerItem,
   TextLayerItem,
+  TransitionType,
   VideoClip,
   VideoProject,
 } from "../types";
 import { formatTimecode } from "../state/projectDefaults";
-import { computeClipTimeRanges, findClipAtTime } from "../state/useProjectState";
+import { computeClipTimeRanges, findPlaybackStateAtTime } from "../state/useProjectState";
 import { captureVideoFrame } from "../utils/mediaUtils";
+
+function getClipFilter(clip: VideoClip | undefined): string {
+  if (!clip) return "none";
+  const parts: string[] = [];
+  switch (clip.filterPreset) {
+    case "warm":
+      parts.push("sepia(0.3) saturate(1.2) hue-rotate(-10deg)");
+      break;
+    case "cool":
+      parts.push("hue-rotate(20deg) saturate(1.1)");
+      break;
+    case "vintage":
+      parts.push("sepia(0.6) contrast(1.1) brightness(0.9)");
+      break;
+    case "bw":
+      parts.push("grayscale(1)");
+      break;
+    case "fade":
+      parts.push("contrast(0.85) brightness(1.1)");
+      break;
+    case "bright":
+      parts.push("brightness(1.25) contrast(1.05)");
+      break;
+    case "contrast":
+      parts.push("contrast(1.3)");
+      break;
+    default:
+      break;
+  }
+  if (clip.brightness !== 0) parts.push(`brightness(${1 + clip.brightness / 100})`);
+  if (clip.contrast !== 0) parts.push(`contrast(${1 + clip.contrast / 100})`);
+  if (clip.saturation !== 0) parts.push(`saturate(${1 + clip.saturation / 100})`);
+  return parts.length > 0 ? parts.join(" ") : "none";
+}
+
+function getClipTransform(clip: VideoClip | undefined): string {
+  if (!clip) return "none";
+  const scale = clip.scale || 1.0;
+  const rot = clip.rotation || 0;
+  const flipX = clip.flipHorizontal ? -1 : 1;
+  const flipY = clip.flipVertical ? -1 : 1;
+  const offX = clip.offsetX || 0;
+  const offY = clip.offsetY || 0;
+  return `translate(${offX}%, ${offY}%) scale(${scale}) scale(${flipX}, ${flipY}) rotate(${rot}deg)`;
+}
+
+function getTransitionStyles(type: TransitionType, progress: number): {
+  fromWrapperStyle: React.CSSProperties;
+  toWrapperStyle: React.CSSProperties;
+} {
+  const p = Math.max(0, Math.min(1, progress));
+  switch (type) {
+    case "fade":
+    case "dissolve":
+    case "crossfade":
+      return {
+        fromWrapperStyle: { opacity: 1 - p, zIndex: 1 },
+        toWrapperStyle: { opacity: p, zIndex: 2 },
+      };
+    case "slide_left":
+      return {
+        fromWrapperStyle: { transform: `translateX(-${p * 100}%)`, zIndex: 1 },
+        toWrapperStyle: { transform: `translateX(${(1 - p) * 100}%)`, zIndex: 2 },
+      };
+    case "slide_right":
+      return {
+        fromWrapperStyle: { transform: `translateX(${p * 100}%)`, zIndex: 1 },
+        toWrapperStyle: { transform: `translateX(-${(1 - p) * 100}%)`, zIndex: 2 },
+      };
+    case "wipe":
+    case "wipe_left":
+      return {
+        fromWrapperStyle: { zIndex: 1 },
+        toWrapperStyle: { clipPath: `inset(0 0 0 ${(1 - p) * 100}%)`, zIndex: 2 },
+      };
+    case "wipe_right":
+      return {
+        fromWrapperStyle: { zIndex: 1 },
+        toWrapperStyle: { clipPath: `inset(0 ${(1 - p) * 100}% 0 0)`, zIndex: 2 },
+      };
+    case "zoom":
+      return {
+        fromWrapperStyle: { transform: `scale(${1 + p * 0.25})`, opacity: 1 - p, zIndex: 1 },
+        toWrapperStyle: { transform: `scale(${0.8 + p * 0.2})`, opacity: p, zIndex: 2 },
+      };
+    case "blur":
+      return {
+        fromWrapperStyle: { filter: `blur(${p * 16}px)`, opacity: 1 - p * 0.3, zIndex: 1 },
+        toWrapperStyle: { filter: `blur(${(1 - p) * 16}px)`, opacity: p, zIndex: 2 },
+      };
+    default:
+      return {
+        fromWrapperStyle: { opacity: 1 - p, zIndex: 1 },
+        toWrapperStyle: { opacity: p, zIndex: 2 },
+      };
+  }
+}
 
 interface CanvasPreviewProps {
   project: VideoProject;
@@ -67,6 +165,7 @@ export const CanvasPreview = memo(function CanvasPreview({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const secondaryVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -76,13 +175,30 @@ export const CanvasPreview = memo(function CanvasPreview({
   const [isMasterMuted, setIsMasterMuted] = useState<boolean>(false);
 
   const clipRanges = useMemo(() => computeClipTimeRanges(project.clips), [project.clips]);
-  const activeClipInfo = useMemo(() => findClipAtTime(clipRanges, currentTime), [clipRanges, currentTime]);
+  const playbackState = useMemo(() => findPlaybackStateAtTime(clipRanges, currentTime), [clipRanges, currentTime]);
+  const activeClipInfo = playbackState.activeClipInfo;
+  const activeTransition = playbackState.activeTransition;
 
   const activeAssetId = activeClipInfo?.clip.assetId;
   const activeAsset: MediaAsset | undefined = useMemo(() => {
     if (!activeAssetId) return undefined;
     return project.assets.find((a) => a.id === activeAssetId);
   }, [activeAssetId, project.assets]);
+
+  const fromAsset = useMemo(() => {
+    if (!activeTransition) return undefined;
+    return project.assets.find((a) => a.id === activeTransition.fromClip.assetId);
+  }, [activeTransition, project.assets]);
+
+  const toAsset = useMemo(() => {
+    if (!activeTransition) return undefined;
+    return project.assets.find((a) => a.id === activeTransition.toClip.assetId);
+  }, [activeTransition, project.assets]);
+
+  const transStyles = useMemo(() => {
+    if (!activeTransition) return null;
+    return getTransitionStyles(activeTransition.type, activeTransition.progress);
+  }, [activeTransition]);
 
   // Determine active background audio
   const activeAudioTrack = useMemo(() => {
@@ -98,6 +214,7 @@ export const CanvasPreview = memo(function CanvasPreview({
   }, [activeAudioAssetId, project.assets]);
 
   const currentVideoSrcRef = useRef<string | null>(null);
+  const secondaryVideoSrcRef = useRef<string | null>(null);
   const currentClipIdRef = useRef<string | null>(null);
   const isPlayingRef = useRef<boolean>(isPlaying);
 
@@ -108,7 +225,47 @@ export const CanvasPreview = memo(function CanvasPreview({
   // 1. Sync Video/Audio Sources and Volumes (without forced seeks during playback)
   useEffect(() => {
     const video = videoRef.current;
+    const secVideo = secondaryVideoRef.current;
+
+    // Handle Active Transition between adjacent clips
+    if (activeTransition && fromAsset && toAsset) {
+      if (video && activeTransition.fromClip.type === "video") {
+        if (currentVideoSrcRef.current !== fromAsset.objectUrl) {
+          currentVideoSrcRef.current = fromAsset.objectUrl;
+          video.src = fromAsset.objectUrl;
+          video.currentTime = activeTransition.fromLocalTime;
+          if (isPlayingRef.current) video.play().catch(() => {});
+        }
+        currentClipIdRef.current = activeTransition.fromClip.id;
+        video.playbackRate = Math.max(0.25, Math.min(4.0, activeTransition.fromClip.speed || 1.0));
+        const fromVol = activeTransition.fromClip.isMuted ? 0 : activeTransition.fromClip.volume;
+        video.volume = isMasterMuted ? 0 : Math.min(1, fromVol * masterVolume * (1 - activeTransition.progress));
+      }
+
+      if (secVideo && activeTransition.toClip.type === "video") {
+        if (secondaryVideoSrcRef.current !== toAsset.objectUrl) {
+          secondaryVideoSrcRef.current = toAsset.objectUrl;
+          secVideo.src = toAsset.objectUrl;
+          secVideo.currentTime = activeTransition.toLocalTime;
+          if (isPlayingRef.current) secVideo.play().catch(() => {});
+        }
+        secVideo.playbackRate = Math.max(0.25, Math.min(4.0, activeTransition.toClip.speed || 1.0));
+        const toVol = activeTransition.toClip.isMuted ? 0 : activeTransition.toClip.volume;
+        secVideo.volume = isMasterMuted ? 0 : Math.min(1, toVol * masterVolume * activeTransition.progress);
+      }
+      return;
+    }
+
+    // When not in transition, ensure secondary video is paused
+    if (secVideo && !secVideo.paused) {
+      secVideo.pause();
+    }
+
+    // Normal active clip playback
     if (!video || !activeClipInfo || !activeAsset || activeClipInfo.clip.type !== "video") {
+      if (video && !video.paused) {
+        video.pause();
+      }
       return;
     }
 
@@ -137,6 +294,9 @@ export const CanvasPreview = memo(function CanvasPreview({
     activeClipInfo?.clip.speed,
     activeClipInfo?.clip.volume,
     activeClipInfo?.clip.isMuted,
+    activeTransition,
+    fromAsset?.objectUrl,
+    toAsset?.objectUrl,
     isMasterMuted,
     masterVolume,
   ]);
@@ -144,27 +304,47 @@ export const CanvasPreview = memo(function CanvasPreview({
   // 2. Play / Pause Control
   useEffect(() => {
     const video = videoRef.current;
+    const secVideo = secondaryVideoRef.current;
     const audio = bgAudioRef.current;
 
     if (isPlaying) {
-      if (video && activeClipInfo?.clip.type === "video") {
-        video.play().catch(() => {});
+      if (activeTransition) {
+        if (video && activeTransition.fromClip.type === "video") video.play().catch(() => {});
+        if (secVideo && activeTransition.toClip.type === "video") secVideo.play().catch(() => {});
+      } else {
+        if (video && activeClipInfo?.clip.type === "video") {
+          video.play().catch(() => {});
+        }
       }
       if (audio && activeAudioTrack && activeAudioAsset) {
         audio.play().catch(() => {});
       }
     } else {
       if (video) video.pause();
+      if (secVideo) secVideo.pause();
       if (audio) audio.pause();
     }
-  }, [isPlaying, activeClipInfo?.clip.type, activeAudioTrack, activeAudioAsset]);
+  }, [isPlaying, activeClipInfo?.clip.type, activeTransition, activeAudioTrack, activeAudioAsset]);
 
   // 3. Seek Synchronization (ONLY when paused to completely eliminate playback stutter)
   useEffect(() => {
     if (isPlaying) return;
 
     const video = videoRef.current;
-    if (video && activeClipInfo && activeClipInfo.clip.type === "video") {
+    const secVideo = secondaryVideoRef.current;
+
+    if (activeTransition) {
+      if (video && activeTransition.fromClip.type === "video") {
+        if (Math.abs(video.currentTime - activeTransition.fromLocalTime) > 0.05) {
+          video.currentTime = activeTransition.fromLocalTime;
+        }
+      }
+      if (secVideo && activeTransition.toClip.type === "video") {
+        if (Math.abs(secVideo.currentTime - activeTransition.toLocalTime) > 0.05) {
+          secVideo.currentTime = activeTransition.toLocalTime;
+        }
+      }
+    } else if (video && activeClipInfo && activeClipInfo.clip.type === "video") {
       const desiredTime = activeClipInfo.localSourceTime;
       if (Math.abs(video.currentTime - desiredTime) > 0.05) {
         video.currentTime = desiredTime;
@@ -183,7 +363,7 @@ export const CanvasPreview = memo(function CanvasPreview({
       const effectiveVol = isMasterMuted ? 0 : Math.min(1, (activeAudioTrack.isMuted ? 0 : activeAudioTrack.volume) * masterVolume);
       audio.volume = effectiveVol;
     }
-  }, [currentTime, isPlaying, activeClipInfo, activeAudioTrack, activeAudioAsset, isMasterMuted, masterVolume]);
+  }, [currentTime, isPlaying, activeClipInfo, activeTransition, activeAudioTrack, activeAudioAsset, isMasterMuted, masterVolume]);
 
   // Playback refs for uninterrupted, non-tearing 60fps RAF loop
   const currentTimeRef = useRef<number>(currentTime);
@@ -210,6 +390,9 @@ export const CanvasPreview = memo(function CanvasPreview({
     let lastThrottledTime = 0;
 
     const tick = (now: number) => {
+      const delta = (now - lastWallTime) / 1000;
+      lastWallTime = now;
+
       const video = videoRef.current;
       const curClipInfo = activeClipInfoRef.current;
       const curAsset = activeAssetRef.current;
@@ -257,8 +440,6 @@ export const CanvasPreview = memo(function CanvasPreview({
         }
       } else {
         // Image clip or gap: advance using delta time
-        const delta = (now - lastWallTime) / 1000;
-        lastWallTime = now;
         const nextTime = currentTimeRef.current + delta;
 
         if (nextTime >= maxDuration) {
@@ -430,8 +611,86 @@ export const CanvasPreview = memo(function CanvasPreview({
           style={aspectRatioStyle}
           className="relative max-w-full max-h-full flex items-center justify-center overflow-hidden bg-black select-none"
         >
-          {/* Active Clip Video or Image */}
-          {activeClipInfo && activeAsset ? (
+          {/* Active Transition or Active Single Clip or Timeline Gap */}
+          {activeTransition && fromAsset && toAsset && transStyles ? (
+            <>
+              {/* Incoming Clip B */}
+              <div
+                style={{
+                  ...transStyles.toWrapperStyle,
+                  transformOrigin: "center center",
+                  willChange: "transform, opacity, clip-path, filter",
+                }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
+              >
+                {activeTransition.toClip.type === "video" ? (
+                  <video
+                    ref={secondaryVideoRef}
+                    playsInline
+                    muted={activeTransition.toClip.isMuted || isMasterMuted}
+                    style={{
+                      filter: getClipFilter(activeTransition.toClip),
+                      transform: getClipTransform(activeTransition.toClip),
+                      opacity: activeTransition.toClip.opacity ?? 1.0,
+                      transformOrigin: "center center",
+                    }}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={toAsset.objectUrl}
+                    alt={toAsset.name}
+                    style={{
+                      filter: getClipFilter(activeTransition.toClip),
+                      transform: getClipTransform(activeTransition.toClip),
+                      opacity: activeTransition.toClip.opacity ?? 1.0,
+                      transformOrigin: "center center",
+                    }}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+
+              {/* Outgoing Clip A */}
+              <div
+                style={{
+                  ...transStyles.fromWrapperStyle,
+                  transformOrigin: "center center",
+                  willChange: "transform, opacity, clip-path, filter",
+                }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
+              >
+                {activeTransition.fromClip.type === "video" ? (
+                  <video
+                    ref={videoRef}
+                    playsInline
+                    muted={activeTransition.fromClip.isMuted || isMasterMuted}
+                    style={{
+                      filter: getClipFilter(activeTransition.fromClip),
+                      transform: getClipTransform(activeTransition.fromClip),
+                      opacity: activeTransition.fromClip.opacity ?? 1.0,
+                      transformOrigin: "center center",
+                    }}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={fromAsset.objectUrl}
+                    alt={fromAsset.name}
+                    style={{
+                      filter: getClipFilter(activeTransition.fromClip),
+                      transform: getClipTransform(activeTransition.fromClip),
+                      opacity: activeTransition.fromClip.opacity ?? 1.0,
+                      transformOrigin: "center center",
+                    }}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+            </>
+          ) : activeClipInfo && activeAsset ? (
             activeClipInfo.clip.type === "video" ? (
               <video
                 ref={videoRef}
@@ -463,7 +722,11 @@ export const CanvasPreview = memo(function CanvasPreview({
             )
           ) : (
             <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500 pointer-events-none">
-              <p className="text-xs">No media on timeline at {formatTimecode(currentTime)}</p>
+              <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center mb-1.5 bg-white/[0.03]">
+                <div className="w-2 h-2 rounded-full bg-slate-600" />
+              </div>
+              <p className="text-xs font-mono text-slate-400">Empty Timeline Gap</p>
+              <p className="text-[10px] font-mono text-slate-600 mt-0.5">{formatTimecode(currentTime)}</p>
             </div>
           )}
 
