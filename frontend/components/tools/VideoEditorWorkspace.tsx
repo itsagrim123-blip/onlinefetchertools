@@ -1,653 +1,598 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Camera,
-  CheckCircle2,
   Download,
   Film,
-  Gauge,
-  Loader2,
-  Play,
-  Pause,
-  RotateCcw,
+  Layers,
+  Music,
+  Plus,
   Scissors,
-  UploadCloud,
-  Volume2,
-  VolumeX,
+  Sliders,
+  Sparkles,
+  Type,
+  Video,
 } from "lucide-react";
-import { runFileTool } from "@/lib/api";
-
-function formatSeconds(seconds: number): string {
-  if (isNaN(seconds) || seconds < 0) return "00:00.0";
-  const mins = Math.floor(seconds / 60);
-  const secs = (seconds % 60).toFixed(1);
-  const formattedSecs = parseFloat(secs) < 10 ? `0${secs}` : secs;
-  const formattedMins = mins < 10 ? `0${mins}` : `${mins}`;
-  return `${formattedMins}:${formattedSecs}`;
-}
-
-function parseSeconds(val: string): number {
-  const parts = val.trim().split(":");
-  if (parts.length === 2) {
-    const mins = parseFloat(parts[0]) || 0;
-    const secs = parseFloat(parts[1]) || 0;
-    return mins * 60 + secs;
-  }
-  return parseFloat(val) || 0;
-}
-
-function formatSize(bytes: number): string {
-  if (!bytes) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`;
-}
+import { useProjectState } from "./video-editor/state/useProjectState";
+import { CanvasPreview } from "./video-editor/components/CanvasPreview";
+import { Timeline } from "./video-editor/components/Timeline";
+import { ProjectMediaBin } from "./video-editor/components/ProjectMediaBin";
+import { ClipInspector } from "./video-editor/components/inspector/ClipInspector";
+import { AudioInspector } from "./video-editor/components/inspector/AudioInspector";
+import { TextInspector } from "./video-editor/components/inspector/TextInspector";
+import { FilterInspector } from "./video-editor/components/inspector/FilterInspector";
+import { TransitionModal } from "./video-editor/components/inspector/TransitionModal";
+import { ExportModal } from "./video-editor/components/ExportModal";
+import {
+  ActiveToolTab,
+  AspectRatioPreset,
+  ClipTransition,
+  ExportSettings,
+} from "./video-editor/types";
+import { normalizeBlob, parseFilename, resolveMimeType } from "@/lib/download";
 
 export function VideoEditorWorkspace() {
-  const [file, setFile] = useState<File | null>(null);
-  const [duration, setDuration] = useState<number>(0);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const {
+    project,
+    totalDuration,
+    currentTime,
+    setCurrentTime,
+    isPlaying,
+    togglePlay,
+    seekTo,
+    selectedClipId,
+    selectedAudioId,
+    selectedTextId,
+    selectedOverlayId,
+    selectClip,
+    selectAudio,
+    selectText,
+    selectOverlay,
+    activeTab,
+    setActiveTab,
+    timelineZoom,
+    setTimelineZoom,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    addAsset,
+    removeAsset,
+    addClipFromAsset,
+    updateClip,
+    removeClip,
+    duplicateClip,
+    splitClipAtTime,
+    trimClip,
+    addAudioTrack,
+    updateAudioTrack,
+    removeAudioTrack,
+    addTextLayer,
+    updateTextLayer,
+    removeTextLayer,
+    addOverlayLayer,
+    updateOverlayLayer,
+    removeOverlayLayer,
+    setAspectRatio,
+    setProjectTitle,
+  } = useProjectState();
 
-  // Editing parameters
-  const [startTime, setStartTime] = useState<number>(0);
-  const [endTime, setEndTime] = useState<number>(0);
-  const [resolution, setResolution] = useState<string>("original");
-  const [quality, setQuality] = useState<string>("high");
-  const [outputFormat, setOutputFormat] = useState<string>("mp4");
-  const [includeAudio, setIncludeAudio] = useState<boolean>(true);
-  const [speed, setSpeed] = useState<number>(1.0);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [transitionClipId, setTransitionClipId] = useState<string | null>(null);
 
-  // Frame extraction states
-  const [frameFormat, setFrameFormat] = useState<"jpg" | "png">("jpg");
-  const [capturedFrame, setCapturedFrame] = useState<{ url: string; name: string } | null>(null);
-  const [targetTimestampInput, setTargetTimestampInput] = useState<string>("");
-
-  // Execution states
-  const [busy, setBusy] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  const videoUrl = useMemo(() => {
-    if (!file) return null;
-    return URL.createObjectURL(file);
-  }, [file]);
-
+  // Keyboard Shortcuts (Undo, Redo, Play/Pause, Delete)
   useEffect(() => {
-    return () => {
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Space -> Toggle Play
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+        return;
+      }
+
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (canRedo) redo();
+        } else {
+          if (canUndo) undo();
+        }
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        if (canRedo) redo();
+        return;
+      }
+
+      // Delete key
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedClipId) {
+          e.preventDefault();
+          removeClip(selectedClipId);
+        } else if (selectedAudioId) {
+          e.preventDefault();
+          removeAudioTrack(selectedAudioId);
+        } else if (selectedTextId) {
+          e.preventDefault();
+          removeTextLayer(selectedTextId);
+        } else if (selectedOverlayId) {
+          e.preventDefault();
+          removeOverlayLayer(selectedOverlayId);
+        }
       }
     };
-  }, [videoUrl]);
 
-  const onLoadedMetadata = () => {
-    if (videoRef.current) {
-      const vidDuration = videoRef.current.duration;
-      setDuration(vidDuration);
-      setStartTime(0);
-      setEndTime(vidDuration);
-      setCurrentTime(0);
-    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    togglePlay,
+    selectedClipId,
+    selectedAudioId,
+    selectedTextId,
+    selectedOverlayId,
+    removeClip,
+    removeAudioTrack,
+    removeTextLayer,
+    removeOverlayLayer,
+  ]);
+
+  // Active clip object
+  const selectedClip = project.clips.find((c) => c.id === selectedClipId);
+  const selectedAudio = project.audioTracks.find((a) => a.id === selectedAudioId);
+  const selectedText = project.textLayers.find((t) => t.id === selectedTextId);
+
+  // Handle Delete Selected
+  const handleDeleteSelected = () => {
+    if (selectedClipId) removeClip(selectedClipId);
+    else if (selectedAudioId) removeAudioTrack(selectedAudioId);
+    else if (selectedTextId) removeTextLayer(selectedTextId);
+    else if (selectedOverlayId) removeOverlayLayer(selectedOverlayId);
   };
 
-  const onTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-      // Auto pause if reached endTime during cut preview
-      if (videoRef.current.currentTime >= endTime && isPlaying) {
-        videoRef.current.pause();
-        setIsPlaying(false);
+  // Handle Duplicate Selected
+  const handleDuplicateSelected = () => {
+    if (selectedClipId) duplicateClip(selectedClipId);
+  };
+
+  // Backend Export Execution
+  const handleExportProject = async (
+    settings: ExportSettings
+  ): Promise<{ url: string; name: string; size: number } | null> => {
+    // Construct backend manifest
+    const manifest = {
+      title: project.title || "video_project",
+      settings: {
+        aspect_ratio: project.settings.aspectRatio,
+        canvas_width: project.settings.canvasWidth,
+        canvas_height: project.settings.canvasHeight,
+        fps: settings.fps,
+      },
+      clips: project.clips.map((c) => ({
+        id: c.id,
+        asset_id: c.assetId,
+        name: c.name,
+        type: c.type,
+        source_duration: c.sourceDuration,
+        start_trim: c.startTrim,
+        end_trim: c.endTrim,
+        speed: c.speed,
+        is_reversed: c.isReversed,
+        volume: c.volume,
+        is_muted: c.isMuted,
+        fade_in_duration: c.fadeInDuration,
+        fade_out_duration: c.fadeOutDuration,
+        scale: c.scale,
+        rotation: c.rotation,
+        flip_horizontal: c.flipHorizontal,
+        flip_vertical: c.flipVertical,
+        offset_x: c.offsetX,
+        offset_y: c.offsetY,
+        filter_preset: c.filterPreset,
+        brightness: c.brightness,
+        contrast: c.contrast,
+        saturation: c.saturation,
+        transition: c.transition
+          ? {
+              type: c.transition.type,
+              duration: c.transition.duration,
+            }
+          : undefined,
+      })),
+      audio_tracks: project.audioTracks.map((a) => ({
+        id: a.id,
+        asset_id: a.assetId,
+        name: a.name,
+        source_duration: a.sourceDuration,
+        timeline_start: a.timelineStart,
+        start_trim: a.startTrim,
+        duration: a.duration,
+        volume: a.volume,
+        is_muted: a.isMuted,
+        fade_in_duration: a.fadeInDuration,
+        fade_out_duration: a.fadeOutDuration,
+      })),
+      text_layers: project.textLayers.map((t) => ({
+        id: t.id,
+        text: t.text,
+        timeline_start: t.timelineStart,
+        duration: t.duration,
+        font_size: t.fontSize,
+        font_color: t.fontColor,
+        background_color: t.backgroundColor,
+        alignment: t.alignment,
+        is_bold: t.isBold,
+        is_italic: t.isItalic,
+        animation: t.animation,
+        position_x: t.positionX,
+        position_y: t.positionY,
+      })),
+      overlay_layers: project.overlayLayers.map((o) => ({
+        id: o.id,
+        asset_id: o.assetId,
+        name: o.name,
+        timeline_start: o.timelineStart,
+        duration: o.duration,
+        scale: o.scale,
+        opacity: o.opacity,
+        position_x: o.positionX,
+        position_y: o.positionY,
+        rotation: o.rotation,
+      })),
+      export_settings: {
+        format: settings.format,
+        resolution: settings.resolution,
+        quality: settings.quality,
+        fps: settings.fps,
+      },
+    };
+
+    const formData = new FormData();
+    formData.append("manifest", JSON.stringify(manifest));
+
+    // Append asset files
+    for (const asset of project.assets) {
+      formData.append(`asset_${asset.id}`, asset.file, asset.name);
+    }
+
+    const res = await fetch("/api/media/project-render", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      let detail = "Export render failed.";
+      try {
+        const data = await res.json();
+        if (data?.detail) detail = data.detail;
+      } catch {
+        // use default
       }
+      throw new Error(detail);
+    }
+
+    const rawBlob = await res.blob();
+    const filename = parseFilename(
+      res.headers,
+      project.title || "video_project",
+      `.${settings.format}`
+    );
+    const mimeType = resolveMimeType(
+      res.headers.get("content-type"),
+      filename,
+      rawBlob.type
+    );
+    const safeBlob = normalizeBlob(rawBlob, mimeType);
+    const blobUrl = URL.createObjectURL(safeBlob);
+
+    return {
+      url: blobUrl,
+      name: filename,
+      size: safeBlob.size,
+    };
+  };
+
+  // Transition Modal Helpers
+  const transitionClip = project.clips.find((c) => c.id === transitionClipId);
+  const handleApplyTransition = (trans: ClipTransition | undefined) => {
+    if (transitionClipId) {
+      updateClip(transitionClipId, { transition: trans });
     }
   };
-
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      if (currentTime >= endTime || currentTime < startTime) {
-        videoRef.current.currentTime = startTime;
-      }
-      videoRef.current.play().catch(() => {});
-      setIsPlaying(true);
-    }
-  };
-
-  const seekTo = (seconds: number) => {
-    if (videoRef.current) {
-      const clamped = Math.max(0, Math.min(seconds, duration));
-      videoRef.current.currentTime = clamped;
-      setCurrentTime(clamped);
-    }
-  };
-
-  const addFile = (selected: File) => {
-    setError(null);
-    setResult(null);
-    setFile(selected);
-  };
-
-  const onDrop = (event: DragEvent<HTMLLabelElement>) => {
-    event.preventDefault();
-    const dropped = event.dataTransfer.files[0];
-    if (dropped) addFile(dropped);
-  };
-
-  const onChoose = (event: ChangeEvent<HTMLInputElement>) => {
-    const chosen = event.target.files?.[0];
-    if (chosen) addFile(chosen);
-  };
-
-  const handleSetCurrentAsStart = () => {
-    const nextStart = Math.min(currentTime, endTime);
-    setStartTime(nextStart);
-  };
-
-  const handleSetCurrentAsEnd = () => {
-    const nextEnd = Math.max(currentTime, startTime);
-    setEndTime(nextEnd);
-  };
-
-  const handleExport = async () => {
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      if (startTime > 0) form.append("start_time", startTime.toFixed(2));
-      if (endTime > 0 && endTime < duration) form.append("end_time", endTime.toFixed(2));
-      if (resolution !== "original") form.append("resolution", resolution);
-      form.append("quality", quality);
-      form.append("output_format", outputFormat);
-      form.append("include_audio", includeAudio ? "true" : "false");
-      if (speed !== 1.0) form.append("speed", String(speed));
-
-      const stem = file.name.replace(/\.[^/.]+$/, "");
-      const fallbackName = `${stem}_edited.${outputFormat}`;
-      const response = await runFileTool("video-editor", form, fallbackName);
-      if (result?.url) URL.revokeObjectURL(result.url);
-      const url = URL.createObjectURL(response.blob);
-      setResult({
-        url,
-        name: response.filename,
-        size: response.blob.size,
-      });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Video processing failed. Make sure the file is valid.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleCaptureFrame = () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const mime = frameFormat === "png" ? "image/png" : "image/jpeg";
-      const ext = frameFormat;
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            setError("Unable to capture frame directly from preview.");
-            return;
-          }
-          if (capturedFrame?.url) URL.revokeObjectURL(capturedFrame.url);
-          const url = URL.createObjectURL(blob);
-          const cleanStem = file ? file.name.replace(/\.[^/.]+$/, "") : "video";
-          const filename = `${cleanStem}_frame_${currentTime.toFixed(1)}s.${ext}`;
-          setCapturedFrame({ url, name: filename });
-        },
-        mime,
-        0.95
-      );
-    } catch {
-      setError("Unable to capture frame directly from preview.");
-    }
-  };
-
-  const handleSeekToCustomTimestamp = () => {
-    const secs = parseSeconds(targetTimestampInput);
-    if (!isNaN(secs)) {
-      seekTo(secs);
-    }
-  };
-
-  const resetAll = () => {
-    if (result?.url) URL.revokeObjectURL(result.url);
-    if (capturedFrame?.url) URL.revokeObjectURL(capturedFrame.url);
-    setFile(null);
-    setResult(null);
-    setError(null);
-    setDuration(0);
-    setCurrentTime(0);
-    setStartTime(0);
-    setEndTime(0);
-    setIsPlaying(false);
-    setSpeed(1.0);
-    setCapturedFrame(null);
-    setTargetTimestampInput("");
-  };
-
-  const cutDuration = Math.max(0, endTime - startTime);
 
   return (
-    <section className="mx-auto max-w-4xl px-4 pb-16 sm:pb-20 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-8">
-        {!file ? (
-          <label
-            onDrop={onDrop}
-            onDragOver={(event) => event.preventDefault()}
-            className="flex min-h-48 sm:min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/30 bg-cyan-400/[0.04] p-4 sm:px-6 text-center transition hover:border-cyan-300 hover:bg-cyan-400/[0.08]"
-          >
-            <input
-              type="file"
-              className="sr-only"
-              accept=".mp4,.webm,.mov,.mkv,.avi,video/*"
-              onChange={onChoose}
-            />
-            <UploadCloud className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-300" />
-            <h2 className="mt-3 sm:mt-4 text-lg sm:text-xl font-semibold text-white">Choose a video file to edit</h2>
-            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-400">
-              Drag &amp; drop or click to upload (MP4, WebM, MOV, MKV, AVI)
+    <section className="mx-auto w-full max-w-7xl px-3 sm:px-6 py-4 sm:py-6 space-y-4">
+      {/* Top Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-3.5 sm:p-4 text-white shadow-xl backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-400 border border-cyan-400/30 shadow-inner">
+            <Video className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={project.title}
+                onChange={(e) => setProjectTitle(e.target.value)}
+                className="bg-transparent text-sm sm:text-base font-bold text-white border-b border-transparent hover:border-white/20 focus:border-cyan-400 focus:outline-none transition"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Multi-Clip Video Editor · Real-time Preview & FFmpeg Render
             </p>
-            <span className="mt-3 sm:mt-4 rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-[11px] sm:text-xs text-slate-400">
-              Trim · Cut · Resize · Quality · Audio Preserved
-            </span>
-          </label>
-        ) : (
-          <div className="space-y-6">
-            {/* File Info Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-3.5 sm:p-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300 border border-cyan-400/20">
-                  <Film className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{file.name}</p>
-                  <p className="text-xs text-slate-400">
-                    {formatSize(file.size)} {duration > 0 && `· Total: ${formatSeconds(duration)}`}
-                  </p>
-                </div>
-              </div>
+          </div>
+        </div>
+
+        {/* Aspect Ratio Selector & Export Button */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Aspect Ratio Presets */}
+          <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-white/10 text-xs">
+            {(["16:9", "9:16", "1:1", "4:5"] as AspectRatioPreset[]).map((ratio) => (
               <button
+                key={ratio}
                 type="button"
-                onClick={resetAll}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white"
+                onClick={() => setAspectRatio(ratio)}
+                className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                  project.settings.aspectRatio === ratio
+                    ? "bg-cyan-400 text-slate-950 font-bold"
+                    : "text-slate-400 hover:text-white"
+                }`}
               >
-                <RotateCcw className="h-3.5 w-3.5" /> Choose another
+                {ratio}
               </button>
-            </div>
+            ))}
+          </div>
 
-            {/* Video Player Preview */}
-            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-inner">
-              {videoUrl && (
-                <video
-                  ref={videoRef}
-                  src={videoUrl}
-                  className="max-h-[240px] sm:max-h-[380px] w-full object-contain"
-                  onLoadedMetadata={onLoadedMetadata}
-                  onTimeUpdate={onTimeUpdate}
-                  onEnded={() => setIsPlaying(false)}
-                  playsInline
-                />
-              )}
-              {/* Play / Pause overlay */}
-              <div className="flex items-center justify-between bg-slate-950/90 px-4 py-2.5 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20 transition"
-                  aria-label={isPlaying ? "Pause" : "Play"}
-                >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
-                </button>
-                <div className="text-xs font-mono text-slate-300">
-                  <span className="text-cyan-300">{formatSeconds(currentTime)}</span> / {formatSeconds(duration)}
-                </div>
-              </div>
-            </div>
+          {/* Export Button */}
+          <button
+            type="button"
+            onClick={() => setIsExportModalOpen(true)}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 text-xs font-semibold text-slate-950 shadow-lg shadow-cyan-950/40 hover:brightness-110 active:scale-95 transition"
+          >
+            <Download className="h-4 w-4" />
+            <span>Export</span>
+          </button>
+        </div>
+      </div>
 
-            {/* Interactive Timeline & Cut Scrubbing */}
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3.5 sm:p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">
-                  <Scissors className="h-3.5 w-3.5" /> Trim &amp; Timeline Range
-                </span>
-                <span className="rounded-full bg-cyan-400/10 px-2.5 py-0.5 text-xs font-mono font-medium text-cyan-300 border border-cyan-400/20">
-                  Selected: {formatSeconds(cutDuration)}
-                </span>
-              </div>
+      {/* Main Workspace (Preview Canvas + Inspector Side Panel) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Left Column: Canvas Preview Player (7 cols) */}
+        <div className="lg:col-span-7 flex flex-col gap-3">
+          <CanvasPreview
+            project={project}
+            currentTime={currentTime}
+            totalDuration={totalDuration}
+            isPlaying={isPlaying}
+            onTimeUpdate={setCurrentTime}
+            onTogglePlay={togglePlay}
+            onSeek={seekTo}
+          />
+        </div>
 
-              {/* Visual Timeline Bar */}
-              <div className="relative h-7 w-full rounded-lg bg-slate-800/80 overflow-hidden cursor-pointer">
-                {/* Selected cut region */}
-                {duration > 0 && (
-                  <div
-                    className="absolute top-0 bottom-0 bg-gradient-to-r from-cyan-500/40 to-blue-500/40 border-x-2 border-cyan-400"
-                    style={{
-                      left: `${(startTime / duration) * 100}%`,
-                      width: `${Math.max(0, ((endTime - startTime) / duration) * 100)}%`,
-                    }}
-                  />
-                )}
-                {/* Current playhead indicator */}
-                {duration > 0 && (
-                  <div
-                    className="absolute top-0 bottom-0 w-1 bg-white shadow-md transition-all duration-75"
-                    style={{ left: `${(currentTime / duration) * 100}%` }}
-                  />
-                )}
-                {/* Clickable scrub track */}
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 1}
-                  step={0.1}
-                  value={currentTime}
-                  onChange={(e) => seekTo(parseFloat(e.target.value))}
-                  className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                  aria-label="Timeline scrubber"
-                />
-              </div>
-
-              {/* Start Time & End Time Controls */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1.5">
-                    <span className="text-xs font-medium text-slate-300">Start Time</span>
-                    <button
-                      type="button"
-                      onClick={handleSetCurrentAsStart}
-                      className="text-[11px] text-cyan-400 hover:text-cyan-300 underline"
-                    >
-                      Set to current ({formatSeconds(currentTime)})
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={formatSeconds(startTime)}
-                    onChange={(e) => setStartTime(Math.max(0, Math.min(parseSeconds(e.target.value), endTime)))}
-                    className="h-9 w-full rounded-lg border border-white/10 bg-slate-950 px-3 font-mono text-sm text-white"
-                  />
-                </div>
-
-                <div className="rounded-xl border border-white/5 bg-slate-900/60 p-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1.5">
-                    <span className="text-xs font-medium text-slate-300">End Time</span>
-                    <button
-                      type="button"
-                      onClick={handleSetCurrentAsEnd}
-                      className="text-[11px] text-cyan-400 hover:text-cyan-300 underline"
-                    >
-                      Set to current ({formatSeconds(currentTime)})
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={formatSeconds(endTime)}
-                    onChange={(e) => setEndTime(Math.min(duration, Math.max(parseSeconds(e.target.value), startTime)))}
-                    className="h-9 w-full rounded-lg border border-white/10 bg-slate-950 px-3 font-mono text-sm text-white"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Playback Speed Changer */}
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3.5 sm:p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">
-                  <Gauge className="h-3.5 w-3.5" /> Video Speed Changer
-                </span>
-                <span className="rounded-full bg-cyan-400/10 px-2.5 py-0.5 text-xs font-mono font-medium text-cyan-300 border border-cyan-400/20">
-                  {speed}× Playback
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => {
-                      setSpeed(s);
-                      if (videoRef.current) videoRef.current.playbackRate = s;
-                    }}
-                    className={`flex-1 min-w-[50px] sm:flex-initial rounded-xl px-3 py-2 text-xs font-semibold transition text-center ${
-                      speed === s
-                        ? "bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-md shadow-cyan-400/20"
-                        : "border border-white/10 bg-slate-900/60 text-slate-300 hover:border-cyan-400/40 hover:text-white"
-                    }`}
-                  >
-                    {s}×
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-slate-500">Audio will remain synchronized at all speeds upon export.</p>
-            </div>
-
-            {/* Video Settings: Resolution, Quality, Audio, Format */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Resolution selector */}
-              <label className="block text-xs text-slate-400">
-                Resolution
-                <select
-                  value={resolution}
-                  onChange={(e) => setResolution(e.target.value)}
-                  className="mt-1.5 h-11 w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 text-sm text-white"
-                >
-                  <option value="original">Original resolution</option>
-                  <option value="1080p">1080p (Full HD)</option>
-                  <option value="720p">720p (HD)</option>
-                  <option value="480p">480p (SD)</option>
-                  <option value="1080x1920">9:16 Vertical (1080x1920)</option>
-                  <option value="1080x1080">1:1 Square (1080x1080)</option>
-                </select>
-              </label>
-
-              {/* Quality selector */}
-              <label className="block text-xs text-slate-400">
-                Quality
-                <select
-                  value={quality}
-                  onChange={(e) => setQuality(e.target.value)}
-                  className="mt-1.5 h-11 w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 text-sm text-white"
-                >
-                  <option value="high">High (Visually lossless, CRF 18)</option>
-                  <option value="medium">Medium (Balanced file size, CRF 23)</option>
-                  <option value="low">Low (Compact file size, CRF 28)</option>
-                </select>
-              </label>
-
-              {/* Output format */}
-              <label className="block text-xs text-slate-400">
-                Output Format
-                <select
-                  value={outputFormat}
-                  onChange={(e) => setOutputFormat(e.target.value)}
-                  className="mt-1.5 h-11 w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 text-sm text-white"
-                >
-                  <option value="mp4">MP4 (Standard / Compatible)</option>
-                  <option value="webm">WebM</option>
-                </select>
-              </label>
-
-              {/* Audio preservation toggle */}
-              <div className="flex flex-col justify-end">
-                <label className="flex h-11 cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-slate-950/80 px-3 text-sm text-slate-200">
-                  <input
-                    type="checkbox"
-                    checked={includeAudio}
-                    onChange={(e) => setIncludeAudio(e.target.checked)}
-                    className="h-4 w-4 rounded border-white/20 accent-cyan-400"
-                  />
-                  <span className="flex items-center gap-1.5">
-                    {includeAudio ? (
-                      <Volume2 className="h-4 w-4 text-cyan-300" />
-                    ) : (
-                      <VolumeX className="h-4 w-4 text-slate-500" />
-                    )}
-                    Preserve audio track
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Frame Extractor Feature */}
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">
-                  <Camera className="h-3.5 w-3.5" /> Video Frame Extractor
-                </span>
-                <span className="text-xs text-slate-400">
-                  Current: <span className="font-mono text-cyan-300">{formatSeconds(currentTime)}</span>
-                </span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex items-center gap-2 flex-1 w-full min-w-0">
-                  <input
-                    type="text"
-                    placeholder="Seek e.g. 01:23 or 15.5"
-                    value={targetTimestampInput}
-                    onChange={(e) => setTargetTimestampInput(e.target.value)}
-                    className="h-10 flex-1 min-w-0 rounded-xl border border-white/10 bg-slate-950 px-3 text-xs text-white placeholder:text-slate-600 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSeekToCustomTimestamp}
-                    className="h-10 px-3 shrink-0 rounded-xl border border-white/10 bg-white/5 text-xs text-slate-200 hover:bg-white/10"
-                  >
-                    Seek
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950 p-1">
-                    <button
-                      type="button"
-                      onClick={() => setFrameFormat("jpg")}
-                      className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
-                        frameFormat === "jpg" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      JPG
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFrameFormat("png")}
-                      className={`px-3 py-1 text-xs rounded-lg font-medium transition ${
-                        frameFormat === "png" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      PNG
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCaptureFrame}
-                    className="inline-flex h-10 flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-cyan-400/20 px-4 text-xs font-semibold text-cyan-300 border border-cyan-400/30 hover:bg-cyan-400/30 transition"
-                  >
-                    <Camera className="h-3.5 w-3.5" /> Capture Frame
-                  </button>
-                </div>
-              </div>
-
-              {capturedFrame && (
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 rounded-xl border border-cyan-400/30 bg-cyan-400/[0.06] p-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={capturedFrame.url}
-                      alt="Captured frame preview"
-                      className="h-14 w-24 rounded-lg object-cover border border-white/10 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white">Frame Captured!</p>
-                      <p className="truncate text-[11px] text-slate-400">{capturedFrame.name}</p>
-                    </div>
-                  </div>
-                  <a
-                    href={capturedFrame.url}
-                    download={capturedFrame.name}
-                    className="inline-flex h-9 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg bg-emerald-400 px-3 text-xs font-semibold text-slate-950 hover:bg-emerald-300 transition shrink-0"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Download
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-3.5 text-sm text-red-200">
-                {error}
-              </p>
-            )}
-
-            {/* Export Button */}
+        {/* Right Column: Tabbed Inspector & Media Bin (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col gap-3">
+          {/* Tool Navigation Tabs */}
+          <div className="flex items-center justify-between gap-1 rounded-2xl border border-white/10 bg-slate-950/70 p-1.5 text-xs text-white">
             <button
               type="button"
-              onClick={handleExport}
-              disabled={busy}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setActiveTab("media")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl font-medium transition ${
+                activeTab === "media"
+                  ? "bg-cyan-400 text-slate-950 font-semibold shadow"
+                  : "text-slate-400 hover:text-white"
+              }`}
             >
-              {busy ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Processing video with FFmpeg...
-                </>
-              ) : (
-                <>
-                  <Scissors className="h-4 w-4" /> Export Edited Video
-                </>
-              )}
+              <Film className="h-3.5 w-3.5" /> Media
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("edit")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl font-medium transition ${
+                activeTab === "edit"
+                  ? "bg-cyan-400 text-slate-950 font-semibold shadow"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Scissors className="h-3.5 w-3.5" /> Clip
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("audio")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl font-medium transition ${
+                activeTab === "audio"
+                  ? "bg-cyan-400 text-slate-950 font-semibold shadow"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Music className="h-3.5 w-3.5" /> Audio
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("text")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl font-medium transition ${
+                activeTab === "text"
+                  ? "bg-cyan-400 text-slate-950 font-semibold shadow"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Type className="h-3.5 w-3.5" /> Text
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("filter")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl font-medium transition ${
+                activeTab === "filter"
+                  ? "bg-cyan-400 text-slate-950 font-semibold shadow"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Filter
+            </button>
+          </div>
 
-            {/* Completed Result Card */}
-            {result && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4 sm:p-5 sm:flex-row sm:items-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-300 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white">Your edited video is ready!</p>
-                  <p className="truncate text-xs text-slate-400">
-                    {result.name} · {formatSize(result.size)}
+          {/* Active Tab Panel Content */}
+          <div className="min-h-[380px]">
+            {activeTab === "media" && (
+              <ProjectMediaBin
+                assets={project.assets}
+                onAddAsset={addAsset}
+                onRemoveAsset={removeAsset}
+                onAddClipToTimeline={(id) => addClipFromAsset(id)}
+                onAddAudioToTimeline={(id) => addAudioTrack(id, currentTime)}
+                onAddOverlayToTimeline={(id) => addOverlayLayer(id, currentTime)}
+              />
+            )}
+
+            {activeTab === "edit" && (
+              selectedClip ? (
+                <ClipInspector
+                  clip={selectedClip}
+                  onUpdateClip={(partial) => updateClip(selectedClip.id, partial)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 p-8 text-center text-slate-400 h-[340px]">
+                  <Scissors className="h-8 w-8 text-slate-600 mb-2" />
+                  <p className="text-xs font-semibold text-white">No Clip Selected</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Click on any clip in the timeline track below to adjust speed, reverse, transforms, or volume.
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
-                  <a
-                    href={result.url}
-                    download={result.name}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-200 transition"
-                  >
-                    <Download className="h-4 w-4" /> Download
-                  </a>
+              )
+            )}
+
+            {activeTab === "audio" && (
+              selectedAudio ? (
+                <AudioInspector
+                  track={selectedAudio}
+                  onUpdateTrack={(partial) => updateAudioTrack(selectedAudio.id, partial)}
+                  onRemoveTrack={() => removeAudioTrack(selectedAudio.id)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 p-8 text-center text-slate-400 h-[340px] space-y-3">
+                  <Music className="h-8 w-8 text-slate-600" />
+                  <div>
+                    <p className="text-xs font-semibold text-white">Background Music</p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Upload an MP3/WAV file in the Media tab and click &quot;+ Track&quot; to add background music.
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
+
+            {activeTab === "text" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">Add titles, subtitles, or captions:</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (result?.url) URL.revokeObjectURL(result.url);
-                      setResult(null);
-                    }}
-                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-slate-300 hover:bg-white/10"
+                    onClick={() => addTextLayer(currentTime, "Sample Title")}
+                    className="inline-flex h-8 items-center gap-1 rounded-xl bg-cyan-400/20 px-3 text-xs font-semibold text-cyan-300 hover:bg-cyan-400/30 transition"
                   >
-                    Edit again
+                    <Plus className="h-3.5 w-3.5" /> Add Text
                   </button>
                 </div>
+
+                {selectedText ? (
+                  <TextInspector
+                    layer={selectedText}
+                    onUpdateLayer={(partial) => updateTextLayer(selectedText.id, partial)}
+                    onRemoveLayer={() => removeTextLayer(selectedText.id)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 p-8 text-center text-slate-400 h-[280px]">
+                    <Type className="h-8 w-8 text-slate-600 mb-2" />
+                    <p className="text-xs font-semibold text-white">No Text Layer Selected</p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Click &quot;Add Text&quot; or select a text block on the timeline.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
+
+            {activeTab === "filter" && (
+              selectedClip ? (
+                <FilterInspector
+                  clip={selectedClip}
+                  onUpdateClip={(partial) => updateClip(selectedClip.id, partial)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 p-8 text-center text-slate-400 h-[340px]">
+                  <Sparkles className="h-8 w-8 text-slate-600 mb-2" />
+                  <p className="text-xs font-semibold text-white">No Clip Selected</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Select a clip in the timeline to apply color adjustments and preset filters.
+                  </p>
+                </div>
+              )
+            )}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Full-width Multi-Track Timeline */}
+      <div className="w-full pt-1">
+        <Timeline
+          project={project}
+          currentTime={currentTime}
+          totalDuration={totalDuration}
+          selectedClipId={selectedClipId}
+          selectedAudioId={selectedAudioId}
+          selectedTextId={selectedTextId}
+          selectedOverlayId={selectedOverlayId}
+          zoom={timelineZoom}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onSeek={seekTo}
+          onSelectClip={(id) => selectClip(id)}
+          onSelectAudio={(id) => selectAudio(id)}
+          onSelectText={(id) => selectText(id)}
+          onSelectOverlay={(id) => selectOverlay(id)}
+          onSplit={(t) => splitClipAtTime(t)}
+          onTrimClip={(id, start, end) => trimClip(id, start, end)}
+          onDuplicate={handleDuplicateSelected}
+          onDelete={handleDeleteSelected}
+          onUndo={undo}
+          onRedo={redo}
+          onZoomChange={setTimelineZoom}
+          onOpenTransitionModal={(id) => setTransitionClipId(id)}
+        />
+      </div>
+
+      {/* Transition Picker Modal */}
+      {transitionClip && (
+        <TransitionModal
+          isOpen={Boolean(transitionClipId)}
+          initialTransition={transitionClip.transition}
+          onClose={() => setTransitionClipId(null)}
+          onApply={handleApplyTransition}
+        />
+      )}
+
+      {/* Export Render Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        project={project}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={handleExportProject}
+      />
     </section>
   );
 }

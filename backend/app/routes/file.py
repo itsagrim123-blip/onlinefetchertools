@@ -3,11 +3,15 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
+from app.errors import ClipFetchError
+from app.services.image_tools import IMAGE_EXTENSIONS
 from app.services.media_tools import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, convert_media, edit_video, extract_frame, video_to_gif
+from app.services.video_project import VideoProjectManifest
+from app.services.video_project.executor import execute_project_render
 from app.utils.concurrency import MEDIA_SEMAPHORE
 from app.utils.files import cleanup_work_dir, create_work_dir, safe_upload_name, save_upload
 from app.utils.responses import download_response
@@ -120,3 +124,49 @@ async def get_frame(
     except Exception:
         cleanup_work_dir(work_dir)
         raise
+
+
+@router.post("/project-render")
+async def project_render(request: Request):
+    work_dir = create_work_dir()
+    try:
+        form = await request.form()
+        manifest_raw = form.get("manifest")
+        if not manifest_raw or not isinstance(manifest_raw, str):
+            raise ClipFetchError("Missing project manifest", status_code=400)
+
+        try:
+            manifest = VideoProjectManifest.model_validate_json(manifest_raw)
+        except Exception as exc:
+            raise ClipFetchError(f"Invalid project manifest: {exc}", status_code=400) from exc
+
+        allowed_exts = VIDEO_EXTENSIONS | AUDIO_EXTENSIONS | IMAGE_EXTENSIONS | {".svg", ".gif", ".bmp"}
+        assets_map: dict[str, Path] = {}
+
+        from starlette.datastructures import UploadFile as StarletteUploadFile
+
+        for key, value in form.items():
+            if key.startswith("asset_") and (isinstance(value, (UploadFile, StarletteUploadFile)) or hasattr(value, "filename")):
+                asset_id = key[len("asset_"):]
+                safe_name = safe_upload_name(getattr(value, "filename", None), fallback=f"{asset_id}.mp4")
+                dest = work_dir / f"{asset_id}_{safe_name}"
+                await save_upload(value, dest, allowed_exts)
+                assets_map[asset_id] = dest
+
+        out_format = manifest.export_settings.format.lower().lstrip(".") or "mp4"
+        clean_title = safe_upload_name(manifest.title, fallback="video_project")
+        output = work_dir / f"{clean_title}.{out_format}"
+
+        async with MEDIA_SEMAPHORE:
+            await asyncio.to_thread(
+                execute_project_render,
+                manifest=manifest,
+                assets_map=assets_map,
+                output_path=output,
+            )
+
+        return download_response(output, filename=output.name, work_dir=work_dir)
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+
