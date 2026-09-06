@@ -129,9 +129,23 @@ export function findPlaybackStateAtTime(
   }
 
   // Normal active clip lookup
-  for (const range of clipRanges) {
+  for (let i = 0; i < clipRanges.length; i++) {
+    const range = clipRanges[i];
     if (clampedTime >= range.startTime && clampedTime < range.endTime) {
-      const elapsedOnTimeline = clampedTime - range.startTime;
+      const prevRange = i > 0 ? clipRanges[i - 1] : undefined;
+      const prevTrans = prevRange?.clip.transition;
+      const hasIncomingTrans =
+        prevTrans &&
+        prevTrans.type !== "none" &&
+        prevTrans.duration > 0 &&
+        prevRange &&
+        Math.abs(range.startTime - prevRange.endTime) <= 0.25;
+
+      const transOffset = hasIncomingTrans
+        ? Math.min(prevTrans!.duration, prevRange!.duration * 0.8, range.duration * 0.8)
+        : 0;
+
+      const elapsedOnTimeline = clampedTime - range.startTime + transOffset;
       const speed = Math.max(0.1, range.clip.speed || 1.0);
       let localSourceTime: number;
       if (range.clip.isReversed) {

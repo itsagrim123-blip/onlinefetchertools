@@ -56,20 +56,26 @@ function getClipFilter(clip: VideoClip | undefined): string {
     default:
       break;
   }
-  if (clip.brightness !== 0) parts.push(`brightness(${1 + clip.brightness / 100})`);
-  if (clip.contrast !== 0) parts.push(`contrast(${1 + clip.contrast / 100})`);
-  if (clip.saturation !== 0) parts.push(`saturate(${1 + clip.saturation / 100})`);
+  if (typeof clip.brightness === "number" && !isNaN(clip.brightness) && clip.brightness !== 0) {
+    parts.push(`brightness(${1 + clip.brightness / 100})`);
+  }
+  if (typeof clip.contrast === "number" && !isNaN(clip.contrast) && clip.contrast !== 0) {
+    parts.push(`contrast(${1 + clip.contrast / 100})`);
+  }
+  if (typeof clip.saturation === "number" && !isNaN(clip.saturation) && clip.saturation !== 0) {
+    parts.push(`saturate(${1 + clip.saturation / 100})`);
+  }
   return parts.length > 0 ? parts.join(" ") : "none";
 }
 
 function getClipTransform(clip: VideoClip | undefined): string {
   if (!clip) return "none";
-  const scale = clip.scale || 1.0;
-  const rot = clip.rotation || 0;
+  const scale = typeof clip.scale === "number" && !isNaN(clip.scale) && clip.scale > 0 ? clip.scale : 1.0;
+  const rot = typeof clip.rotation === "number" && !isNaN(clip.rotation) ? clip.rotation : 0;
   const flipX = clip.flipHorizontal ? -1 : 1;
   const flipY = clip.flipVertical ? -1 : 1;
-  const offX = clip.offsetX || 0;
-  const offY = clip.offsetY || 0;
+  const offX = typeof clip.offsetX === "number" && !isNaN(clip.offsetX) ? clip.offsetX : 0;
+  const offY = typeof clip.offsetY === "number" && !isNaN(clip.offsetY) ? clip.offsetY : 0;
   return `translate(${offX}%, ${offY}%) scale(${scale}) scale(${flipX}, ${flipY}) rotate(${rot}deg)`;
 }
 
@@ -163,6 +169,7 @@ export const CanvasPreview = memo(function CanvasPreview({
   onUpdateText,
 }: CanvasPreviewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const stageViewportRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const secondaryVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -173,6 +180,35 @@ export const CanvasPreview = memo(function CanvasPreview({
   const [capturedFrame, setCapturedFrame] = useState<{ url: string; name: string } | null>(null);
   const [masterVolume, setMasterVolume] = useState<number>(1.0);
   const [isMasterMuted, setIsMasterMuted] = useState<boolean>(false);
+  const [viewportDimensions, setViewportDimensions] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
+
+  // Responsive stage sizing using ResizeObserver to prevent any 0px collapse
+  useEffect(() => {
+    const el = stageViewportRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setViewportDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+    measure();
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setViewportDimensions({ width, height });
+        }
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const clipRanges = useMemo(() => computeClipTimeRanges(project.clips), [project.clips]);
   const playbackState = useMemo(() => findPlaybackStateAtTime(clipRanges, currentTime), [clipRanges, currentTime]);
@@ -223,120 +259,145 @@ export const CanvasPreview = memo(function CanvasPreview({
   const isPlayingRef = useRef<boolean>(isPlaying);
   isPlayingRef.current = isPlaying;
 
+  const lastPrimaryClipIdRef = useRef<string | null>(null);
+  const lastSecondaryClipIdRef = useRef<string | null>(null);
+
   const handlePrimaryLoadedData = () => {
     const video = videoRef.current;
-    if (video && !isPlayingRef.current) {
-      if (Math.abs(video.currentTime - primaryLocalTimeRef.current) > 0.04) {
-        video.currentTime = primaryLocalTimeRef.current;
-      }
+    if (!video) return;
+    if (Math.abs(video.currentTime - primaryLocalTimeRef.current) > 0.04) {
+      video.currentTime = primaryLocalTimeRef.current;
+    }
+    if (isPlayingRef.current && video.paused && !video.ended) {
+      video.play().catch(() => {});
     }
   };
 
   const handleSecondaryLoadedData = () => {
     const secVideo = secondaryVideoRef.current;
-    if (secVideo && !isPlayingRef.current) {
-      if (Math.abs(secVideo.currentTime - secondaryLocalTimeRef.current) > 0.04) {
-        secVideo.currentTime = secondaryLocalTimeRef.current;
-      }
+    if (!secVideo) return;
+    if (Math.abs(secVideo.currentTime - secondaryLocalTimeRef.current) > 0.04) {
+      secVideo.currentTime = secondaryLocalTimeRef.current;
+    }
+    if (isPlayingRef.current && secVideo.paused && !secVideo.ended) {
+      secVideo.play().catch(() => {});
     }
   };
 
-  // 1. Sync Video/Audio Playback Rates, Volumes, and Transitions
+  // Synchronize Primary Video Source
   useEffect(() => {
     const video = videoRef.current;
+    if (!video) return;
+    const targetSrc = primaryAsset?.type === "video" ? primaryAsset.objectUrl : "";
+    if (video.src !== targetSrc && targetSrc) {
+      video.src = targetSrc;
+      video.load();
+    }
+  }, [primaryAsset?.objectUrl, primaryAsset?.type]);
+
+  // Synchronize Secondary Video Source
+  useEffect(() => {
     const secVideo = secondaryVideoRef.current;
-
-    if (video && primaryClip && primaryAsset && primaryClip.type === "video") {
-      video.playbackRate = Math.max(0.25, Math.min(4.0, primaryClip.speed || 1.0));
-      const baseVol = primaryClip.isMuted ? 0 : (primaryClip.volume ?? 1.0);
-      const factor = activeTransition ? (1 - activeTransition.progress) : 1;
-      video.volume = isMasterMuted ? 0 : Math.min(1, baseVol * masterVolume * factor);
+    if (!secVideo) return;
+    const targetSrc = activeTransition && secondaryAsset?.type === "video" ? secondaryAsset.objectUrl : "";
+    if (secVideo.src !== targetSrc && targetSrc) {
+      secVideo.src = targetSrc;
+      secVideo.load();
     }
+  }, [activeTransition, secondaryAsset?.objectUrl, secondaryAsset?.type]);
 
-    if (secVideo && secondaryClip && secondaryAsset && secondaryClip.type === "video") {
-      secVideo.playbackRate = Math.max(0.25, Math.min(4.0, secondaryClip.speed || 1.0));
-      const baseVol = secondaryClip.isMuted ? 0 : (secondaryClip.volume ?? 1.0);
-      secVideo.volume = isMasterMuted ? 0 : Math.min(1, baseVol * masterVolume * (activeTransition?.progress ?? 1));
-    } else if (secVideo && !secVideo.paused) {
-      secVideo.pause();
-    }
-  }, [
-    primaryClip,
-    primaryAsset,
-    secondaryClip,
-    secondaryAsset,
-    activeTransition,
-    isMasterMuted,
-    masterVolume,
-  ]);
-
-  // 2. Play / Pause Control
+  // Synchronize Playback State, Volume, Play/Pause, and Accurate Scrubbing
   useEffect(() => {
     const video = videoRef.current;
     const secVideo = secondaryVideoRef.current;
     const audio = bgAudioRef.current;
 
-    if (isPlaying) {
-      if (video && primaryClip?.type === "video") {
-        video.play().catch(() => {});
-      }
-      if (activeTransition && secVideo && secondaryClip?.type === "video") {
-        secVideo.play().catch(() => {});
-      }
-      if (audio && activeAudioTrack && activeAudioAsset) {
-        audio.play().catch(() => {});
-      }
-    } else {
-      if (video && !video.paused) video.pause();
-      if (secVideo && !secVideo.paused) secVideo.pause();
-      if (audio && !audio.paused) audio.pause();
-    }
-  }, [
-    isPlaying,
-    primaryClip?.type,
-    secondaryClip?.type,
-    activeTransition,
-    activeAudioTrack,
-    activeAudioAsset,
-  ]);
-
-  // 3. Seek Synchronization (ONLY when paused to eliminate playback stutter)
-  useEffect(() => {
-    if (isPlaying) return;
-
-    const video = videoRef.current;
-    const secVideo = secondaryVideoRef.current;
-
-    if (video && primaryClip?.type === "video") {
-      if (Math.abs(video.currentTime - primaryLocalTime) > 0.04) {
-        video.currentTime = primaryLocalTime;
-      }
-    }
-
-    if (activeTransition && secVideo && secondaryClip?.type === "video") {
-      if (Math.abs(secVideo.currentTime - secondaryLocalTime) > 0.04) {
-        secVideo.currentTime = secondaryLocalTime;
-      }
-    }
-
-    const audio = bgAudioRef.current;
+    // 1. Audio Track Sync
     if (audio && activeAudioTrack && activeAudioAsset) {
       if (audio.src !== activeAudioAsset.objectUrl) {
         audio.src = activeAudioAsset.objectUrl;
+        audio.load();
       }
       const desiredAudioTime = currentTime - activeAudioTrack.timelineStart + activeAudioTrack.startTrim;
       if (Math.abs(audio.currentTime - desiredAudioTime) > 0.1) {
         audio.currentTime = Math.max(0, desiredAudioTime);
       }
-      const effectiveVol = isMasterMuted ? 0 : Math.min(1, (activeAudioTrack.isMuted ? 0 : activeAudioTrack.volume) * masterVolume);
+      const effectiveVol = isMasterMuted
+        ? 0
+        : Math.min(1, (activeAudioTrack.isMuted ? 0 : activeAudioTrack.volume) * masterVolume);
       audio.volume = effectiveVol;
+      if (isPlaying && audio.paused) {
+        audio.play().catch(() => {});
+      } else if (!isPlaying && !audio.paused) {
+        audio.pause();
+      }
+    } else if (audio && !audio.paused) {
+      audio.pause();
+    }
+
+    // 2. Primary Video Sync
+    if (video && primaryClip && primaryAsset && primaryClip.type === "video") {
+      video.playbackRate = Math.max(0.25, Math.min(4.0, primaryClip.speed || 1.0));
+      const baseVol = primaryClip.isMuted ? 0 : (primaryClip.volume ?? 1.0);
+      const factor = activeTransition ? 1 - activeTransition.progress : 1;
+      video.volume = isMasterMuted ? 0 : Math.min(1, baseVol * masterVolume * factor);
+
+      const clipChanged = lastPrimaryClipIdRef.current !== primaryClip.id;
+      lastPrimaryClipIdRef.current = primaryClip.id;
+
+      if (!isPlaying) {
+        if (!video.paused) video.pause();
+        if (Math.abs(video.currentTime - primaryLocalTime) > 0.02) {
+          video.currentTime = primaryLocalTime;
+        }
+      } else {
+        // Playing state
+        if (clipChanged || Math.abs(video.currentTime - primaryLocalTime) > 0.2) {
+          video.currentTime = primaryLocalTime;
+        }
+        if (video.paused && !video.ended) {
+          video.play().catch(() => {});
+        }
+      }
+    } else if (video && !video.paused) {
+      video.pause();
+    }
+
+    // 3. Secondary Video Sync (during transition)
+    if (secVideo && activeTransition && secondaryClip && secondaryAsset && secondaryClip.type === "video") {
+      secVideo.playbackRate = Math.max(0.25, Math.min(4.0, secondaryClip.speed || 1.0));
+      const baseVol = secondaryClip.isMuted ? 0 : (secondaryClip.volume ?? 1.0);
+      secVideo.volume = isMasterMuted ? 0 : Math.min(1, baseVol * masterVolume * activeTransition.progress);
+
+      const secClipChanged = lastSecondaryClipIdRef.current !== secondaryClip.id;
+      lastSecondaryClipIdRef.current = secondaryClip.id;
+
+      if (!isPlaying) {
+        if (!secVideo.paused) secVideo.pause();
+        if (Math.abs(secVideo.currentTime - secondaryLocalTime) > 0.02) {
+          secVideo.currentTime = secondaryLocalTime;
+        }
+      } else {
+        // Playing
+        if (secClipChanged || Math.abs(secVideo.currentTime - secondaryLocalTime) > 0.2) {
+          secVideo.currentTime = secondaryLocalTime;
+        }
+        if (secVideo.paused && !secVideo.ended) {
+          secVideo.play().catch(() => {});
+        }
+      }
+    } else if (secVideo && !secVideo.paused) {
+      secVideo.pause();
+      lastSecondaryClipIdRef.current = null;
     }
   }, [
     currentTime,
     isPlaying,
-    primaryClip?.type,
+    primaryClip,
+    primaryAsset,
     primaryLocalTime,
-    secondaryClip?.type,
+    secondaryClip,
+    secondaryAsset,
     secondaryLocalTime,
     activeTransition,
     activeAudioTrack,
@@ -345,23 +406,17 @@ export const CanvasPreview = memo(function CanvasPreview({
     masterVolume,
   ]);
 
-  // Playback refs for uninterrupted, non-tearing 60fps RAF loop
+  // Playback refs for uninterrupted 60fps RAF loop
   const currentTimeRef = useRef<number>(currentTime);
   currentTimeRef.current = currentTime;
-  const activeClipInfoRef = useRef(activeClipInfo);
-  activeClipInfoRef.current = activeClipInfo;
-  const activeAssetRef = useRef(primaryAsset);
-  activeAssetRef.current = primaryAsset;
   const totalDurationRef = useRef<number>(totalDuration);
   totalDurationRef.current = totalDuration;
   const onTimeUpdateRef = useRef(onTimeUpdate);
   onTimeUpdateRef.current = onTimeUpdate;
   const onTogglePlayRef = useRef(onTogglePlay);
   onTogglePlayRef.current = onTogglePlay;
-  const onSeekRef = useRef(onSeek);
-  onSeekRef.current = onSeek;
 
-  // 4. Smooth Hardware-Accelerated Playback Loop (Video element drives time)
+  // Continuous, hardware-accelerated playback clock
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -373,66 +428,24 @@ export const CanvasPreview = memo(function CanvasPreview({
       const delta = (now - lastWallTime) / 1000;
       lastWallTime = now;
 
-      const video = videoRef.current;
-      const curClipInfo = activeClipInfoRef.current;
-      const curAsset = activeAssetRef.current;
+      // Bound delta to 0.1s to avoid huge jumps on tab backgrounding
+      const safeDelta = Math.min(delta, 0.1);
       const maxDuration = totalDurationRef.current;
+      const nextTime = currentTimeRef.current + safeDelta;
 
-      if (curClipInfo && curAsset && curClipInfo.clip.type === "video" && video) {
-        const speed = Math.max(0.25, Math.min(4.0, curClipInfo.clip.speed || 1.0));
-        const clip = curClipInfo.clip;
-        const currentSourceTime = video.currentTime;
-        const startTime = curClipInfo.startTime;
-        const endTime = curClipInfo.endTime;
-        const isReversed = Boolean(clip.isReversed);
+      if (nextTime >= maxDuration) {
+        onTimeUpdateRef.current(maxDuration);
+        onTogglePlayRef.current();
+        return;
+      }
 
-        let elapsedInClip: number;
-        let isClipEnded: boolean;
+      currentTimeRef.current = nextTime;
 
-        if (isReversed) {
-          elapsedInClip = Math.max(0, (clip.endTrim - currentSourceTime) / speed);
-          isClipEnded = currentSourceTime <= clip.startTrim + 0.04;
-        } else {
-          elapsedInClip = Math.max(0, (currentSourceTime - clip.startTrim) / speed);
-          isClipEnded = currentSourceTime >= clip.endTrim - 0.04;
-        }
-
-        const currentProjectTime = startTime + elapsedInClip;
-
-        // Clip boundary completion check
-        if (isClipEnded || currentProjectTime >= endTime - 0.03) {
-          if (endTime >= maxDuration - 0.05) {
-            onTimeUpdateRef.current(maxDuration);
-            onTogglePlayRef.current();
-            return;
-          } else {
-            // Smoothly jump to next clip
-            onSeekRef.current(endTime + 0.02);
-            return;
-          }
-        }
-
-        // Throttle React timeline state updates to ~30 FPS (~33ms)
-        // prevents React from starving the main thread with 60 re-renders/sec
-        if (now - lastThrottledTime >= 33) {
-          lastThrottledTime = now;
-          onTimeUpdateRef.current(currentProjectTime);
-        }
-      } else {
-        // Image clip or gap: advance using delta time
-        const nextTime = currentTimeRef.current + delta;
-
-        if (nextTime >= maxDuration) {
-          onTimeUpdateRef.current(maxDuration);
-          onTogglePlayRef.current();
-          return;
-        } else {
-          currentTimeRef.current = nextTime;
-          if (now - lastThrottledTime >= 33) {
-            lastThrottledTime = now;
-            onTimeUpdateRef.current(nextTime);
-          }
-        }
+      // Throttle React timeline state updates to ~30 FPS (33ms)
+      // to keep scrubber moving smoothly without overloading the React render queue
+      if (now - lastThrottledTime >= 33) {
+        lastThrottledTime = now;
+        onTimeUpdateRef.current(nextTime);
       }
 
       animId = requestAnimationFrame(tick);
@@ -476,19 +489,51 @@ export const CanvasPreview = memo(function CanvasPreview({
   );
 
   // Aspect ratio styling (fills available flex height & width preserving ratio)
-  const aspectRatioStyle = useMemo(() => {
+  const targetRatio = useMemo(() => {
     switch (project.settings.aspectRatio) {
       case "9:16":
-        return { aspectRatio: "9/16", maxHeight: "100%", maxWidth: "100%" };
+        return 9 / 16;
       case "1:1":
-        return { aspectRatio: "1/1", maxHeight: "100%", maxWidth: "100%" };
+        return 1 / 1;
       case "4:5":
-        return { aspectRatio: "4/5", maxHeight: "100%", maxWidth: "100%" };
+        return 4 / 5;
       case "16:9":
       default:
-        return { aspectRatio: "16/9", maxHeight: "100%", maxWidth: "100%" };
+        return 16 / 9;
     }
   }, [project.settings.aspectRatio]);
+
+  const stageStyle = useMemo<React.CSSProperties>(() => {
+    if (viewportDimensions.width > 0 && viewportDimensions.height > 0) {
+      const pad = 16;
+      const maxW = Math.max(80, viewportDimensions.width - pad);
+      const maxH = Math.max(80, viewportDimensions.height - pad);
+      const containerAspect = maxW / maxH;
+
+      let fitW: number;
+      let fitH: number;
+      if (containerAspect > targetRatio) {
+        fitH = maxH;
+        fitW = fitH * targetRatio;
+      } else {
+        fitW = maxW;
+        fitH = fitW / targetRatio;
+      }
+
+      return {
+        width: `${Math.round(fitW)}px`,
+        height: `${Math.round(fitH)}px`,
+        position: "relative",
+      };
+    }
+
+    return {
+      width: "100%",
+      maxHeight: "100%",
+      aspectRatio: `${targetRatio}`,
+      position: "relative",
+    };
+  }, [viewportDimensions, targetRatio]);
 
   // Active Text Layers
   const activeTextLayers = useMemo(() => {
@@ -538,16 +583,17 @@ export const CanvasPreview = memo(function CanvasPreview({
 
       {/* Main Aspect Ratio Canvas Viewport */}
       <div
+        ref={stageViewportRef}
         onClick={() => {
           onSelectOverlay?.(null);
           onSelectText?.(null);
         }}
-        className="relative w-full flex-1 min-h-0 flex items-center justify-center bg-black/95 rounded-xl overflow-hidden border border-white/10 shadow-inner"
+        className="relative w-full flex-1 min-h-0 flex items-center justify-center bg-black/95 rounded-xl overflow-hidden border border-white/10 shadow-inner p-2"
       >
         <div
           ref={stageRef}
-          style={aspectRatioStyle}
-          className="relative max-w-full max-h-full flex items-center justify-center overflow-hidden bg-black select-none"
+          style={stageStyle}
+          className="relative max-w-full max-h-full flex items-center justify-center overflow-hidden bg-black select-none rounded-lg"
         >
           {/* Layer 1: Outgoing or Primary Clip (Permanent DOM node) */}
           <div
@@ -561,15 +607,16 @@ export const CanvasPreview = memo(function CanvasPreview({
           >
             <video
               ref={videoRef}
-              src={primaryAsset?.type === "video" ? primaryAsset.objectUrl : undefined}
               preload="auto"
               playsInline
               muted={primaryClip?.isMuted || isMasterMuted}
               onLoadedData={handlePrimaryLoadedData}
+              onCanPlay={handlePrimaryLoadedData}
+              onError={(e) => console.warn("Primary preview video error:", e)}
               style={{
                 filter: primaryFilter,
                 transform: primaryTransform,
-                opacity: primaryClip?.opacity ?? 1.0,
+                opacity: typeof primaryClip?.opacity === "number" ? primaryClip.opacity : 1.0,
                 display: primaryClip?.type === "video" ? "block" : "none",
                 willChange: "transform, filter",
                 transformOrigin: "center center",
@@ -584,7 +631,7 @@ export const CanvasPreview = memo(function CanvasPreview({
                 style={{
                   filter: primaryFilter,
                   transform: primaryTransform,
-                  opacity: primaryClip.opacity ?? 1.0,
+                  opacity: typeof primaryClip.opacity === "number" ? primaryClip.opacity : 1.0,
                   transformOrigin: "center center",
                 }}
                 className="w-full h-full object-contain"
@@ -604,15 +651,16 @@ export const CanvasPreview = memo(function CanvasPreview({
           >
             <video
               ref={secondaryVideoRef}
-              src={secondaryAsset?.type === "video" ? secondaryAsset.objectUrl : undefined}
               preload="auto"
               playsInline
               muted={secondaryClip?.isMuted || isMasterMuted}
               onLoadedData={handleSecondaryLoadedData}
+              onCanPlay={handleSecondaryLoadedData}
+              onError={(e) => console.warn("Secondary preview video error:", e)}
               style={{
                 filter: secondaryFilter,
                 transform: secondaryTransform,
-                opacity: secondaryClip?.opacity ?? 1.0,
+                opacity: typeof secondaryClip?.opacity === "number" ? secondaryClip.opacity : 1.0,
                 display: secondaryClip?.type === "video" ? "block" : "none",
                 willChange: "transform, filter",
                 transformOrigin: "center center",
@@ -627,7 +675,7 @@ export const CanvasPreview = memo(function CanvasPreview({
                 style={{
                   filter: secondaryFilter,
                   transform: secondaryTransform,
-                  opacity: secondaryClip.opacity ?? 1.0,
+                  opacity: typeof secondaryClip.opacity === "number" ? secondaryClip.opacity : 1.0,
                   transformOrigin: "center center",
                 }}
                 className="w-full h-full object-contain"
@@ -842,11 +890,11 @@ export const CanvasPreview = memo(function CanvasPreview({
         </div>
 
         {/* Center Big Play Button Overlay when paused */}
-        {!isPlaying && totalDuration > 0 && (
+        {!isPlaying && totalDuration > 0 && primaryClip && (
           <button
             type="button"
             onClick={onTogglePlay}
-            className="absolute inset-0 m-auto h-14 w-14 flex items-center justify-center rounded-full bg-cyan-400/90 text-slate-950 shadow-2xl hover:scale-105 transition active:scale-95"
+            className="absolute inset-0 m-auto h-14 w-14 flex items-center justify-center rounded-full bg-cyan-400/90 text-slate-950 shadow-2xl hover:scale-105 transition active:scale-95 z-30 pointer-events-auto"
             title="Play"
           >
             <Play className="h-6 w-6 fill-current translate-x-0.5" />
