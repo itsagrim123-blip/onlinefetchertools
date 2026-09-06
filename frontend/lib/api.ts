@@ -368,3 +368,130 @@ export async function inspectZipArchive(file: File): Promise<ZipInspectResponse>
   return response.json() as Promise<ZipInspectResponse>;
 }
 
+export type CaptionSegment = {
+  id: number;
+  start: number;
+  end: number;
+  text: string;
+};
+
+export type CaptionStyleOptions = {
+  position?: "top" | "center" | "bottom";
+  stylePreset?: "classic" | "clean" | "bold" | "social" | "highlight";
+  fontSize?: number;
+  fontColor?: string;
+  backgroundBox?: boolean;
+  outlineColor?: string;
+  fontFamily?: string;
+};
+
+export type TranscriptionResponse = {
+  language: string;
+  duration: number;
+  segments: CaptionSegment[];
+};
+
+export async function transcribeVideo(
+  file: File,
+  language: string = "auto",
+  translate: boolean = false
+): Promise<TranscriptionResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("language", language);
+  form.append("translate", String(translate));
+
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl("/api/media/auto-captions/transcribe"), {
+      method: "POST",
+      body: form,
+    });
+  } catch {
+    throw new Error("Unable to reach the Online Fetcher Tools backend for transcription. Check server status.");
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Transcription failed" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+
+  return response.json() as Promise<TranscriptionResponse>;
+}
+
+export async function burnCaptionsToVideo(
+  file: File,
+  segments: CaptionSegment[],
+  options?: CaptionStyleOptions
+): Promise<{ blob: Blob; filename: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("captions", JSON.stringify(segments));
+  if (options?.position) form.append("position", options.position);
+  if (options?.stylePreset) form.append("style_preset", options.stylePreset);
+  if (options?.fontSize) form.append("font_size", String(options.fontSize));
+  if (options?.fontColor) form.append("font_color", options.fontColor);
+  if (typeof options?.backgroundBox === "boolean") form.append("background_box", String(options.backgroundBox));
+  if (options?.outlineColor) form.append("outline_color", options.outlineColor);
+  if (options?.fontFamily) form.append("font_family", options.fontFamily);
+
+  const stem = file.name.replace(/\.[^/.]+$/, "");
+  const fallbackFilename = `${stem}-captioned.mp4`;
+
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl("/api/media/auto-captions/export"), {
+      method: "POST",
+      body: form,
+    });
+  } catch {
+    throw new Error("Unable to reach the Online Fetcher Tools backend for video export.");
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Video export failed" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+
+  const contentType = response.headers.get("content-type");
+  const filename = parseFilename(response.headers, fallbackFilename);
+  const rawBlob = await response.blob();
+  const mimeType = resolveMimeType(contentType, filename, "video/mp4");
+  const blob = normalizeBlob(rawBlob, mimeType);
+
+  return { blob, filename };
+}
+
+function formatSrtTime(sec: number): string {
+  const s = Math.max(0, sec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const secs = Math.floor(s % 60);
+  const ms = Math.round((s - Math.floor(s)) * 1000);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(secs).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
+}
+
+export function generateSrtContent(segments: CaptionSegment[]): string {
+  return segments
+    .map((seg, idx) => `${idx + 1}\n${formatSrtTime(seg.start)} --> ${formatSrtTime(seg.end)}\n${seg.text.trim()}\n`)
+    .join("\n");
+}
+
+function formatVttTime(sec: number): string {
+  const s = Math.max(0, sec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const secs = Math.floor(s % 60);
+  const ms = Math.round((s - Math.floor(s)) * 1000);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(secs).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
+}
+
+export function generateVttContent(segments: CaptionSegment[]): string {
+  return (
+    "WEBVTT\n\n" +
+    segments
+      .map((seg, idx) => `${idx + 1}\n${formatVttTime(seg.start)} --> ${formatVttTime(seg.end)}\n${seg.text.trim()}\n`)
+      .join("\n")
+  );
+}
+

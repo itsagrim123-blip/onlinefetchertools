@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import logging
@@ -18,6 +19,7 @@ from app.routes.pdf import router as pdf_router
 from app.routes.file import router as file_router
 from app.routes.archive import router as archive_router
 from app.routes.media import router as media_router
+from app.routes.auto_captions import router as auto_captions_router
 from app.errors import ClipFetchError
 from app.services.cleanup import CleanupService
 
@@ -31,8 +33,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     cleanup_service = CleanupService()
     # Non-blocking warm up of the AI background remover model session
     from app.services.background_remover import BackgroundRemoverService
+    from app.services.captions import AutoCaptionsService
 
     asyncio.create_task(BackgroundRemoverService.get_instance().initialize())
+    asyncio.create_task(AutoCaptionsService.get_instance().initialize())
     try:
         yield
     finally:
@@ -68,6 +72,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(media_router)
+app.include_router(auto_captions_router)
 app.include_router(image_router)
 app.include_router(pdf_router)
 app.include_router(file_router)

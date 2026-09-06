@@ -33,6 +33,9 @@ MIME_TYPE_MAPPING: dict[str, str] = {
     ".ogg": "audio/ogg",
     ".zip": "application/zip",
     ".txt": "text/plain; charset=utf-8",
+    ".srt": "application/x-subrip",
+    ".vtt": "text/vtt",
+    ".ass": "text/x-ssa",
 }
 
 

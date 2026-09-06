@@ -7,6 +7,7 @@ import { ToolCard } from "./ToolCard";
 const categories = [
   { name: "Video & Audio", accent: "from-cyan-400/20", tools: [
     { slug: "youtube", name: "YouTube Downloader", description: "Analyze metadata and download permitted media in your chosen format.", formats: "YouTube · MP4 · MP3", icon: "video" as const, featured: true },
+    { slug: "auto-captions", name: "Auto Captions", description: "Generate captions automatically and add them directly to your videos.", formats: "MP4 · WebM · MOV · MKV", icon: "captions" as const, featured: true },
     { slug: "video-editor", name: "Video Editor", description: "Trim, cut, adjust speed, extract frames, resize and edit videos", formats: "MP4 · WebM · MOV", icon: "editor" as const },
     { slug: "video-to-gif", name: "Video to GIF", description: "Convert video clips into animated, shareable GIFs.", formats: "MP4 · WebM · MOV → GIF", icon: "convert" as const },
     { slug: "audio-extractor", name: "Extract Audio", description: "Pull an audio track from a video file for offline listening.", formats: "MP3 · WAV · M4A · OGG", icon: "audio" as const },

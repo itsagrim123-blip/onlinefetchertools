@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Clapperboard, FileImage, FileText, Film, Gauge, Image, Music2, ScanText, Wrench } from "lucide-react";
+import { ArrowUpRight, Clapperboard, FileImage, FileText, Film, Gauge, Image, Music2, ScanText, Subtitles, Wrench } from "lucide-react";
 import { useUISound } from "@/lib/sounds/useUISound";
 
-export type ToolIconType = "video" | "image" | "compress" | "pdf" | "convert" | "audio" | "scan" | "file" | "editor";
+export type ToolIconType = "video" | "image" | "compress" | "pdf" | "convert" | "audio" | "scan" | "file" | "editor" | "captions";
 
 const icons: Record<ToolIconType, typeof Film> = {
   video: Film,
@@ -16,6 +16,7 @@ const icons: Record<ToolIconType, typeof Film> = {
   scan: ScanText,
   file: FileImage,
   editor: Clapperboard,
+  captions: Subtitles,
 };
 
 export type ToolCardProps = {
