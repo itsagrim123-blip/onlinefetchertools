@@ -8,14 +8,25 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from app.errors import ClipFetchError
-from app.services.image_tools import IMAGE_EXTENSIONS, compress_image, convert_image, crop_image, resize_image, rotate_image
+from app.services.image_tools import (
+    IMAGE_EXTENSIONS,
+    compress_image,
+    convert_image,
+    crop_image,
+    process_remove_background,
+    resize_image,
+    rotate_image,
+)
 from app.utils.files import cleanup_work_dir, create_work_dir, safe_upload_name, save_upload
 from app.utils.responses import download_response
 
 router = APIRouter(prefix="/api/image", tags=["Image tools"])
 
+_bg_semaphore = asyncio.Semaphore(2)
+
 
 def result_file(work_dir: Path, output: Path, filename: str | None = None) -> FileResponse:
+
     return download_response(output, filename=filename or output.name, work_dir=work_dir)
 
 
@@ -117,3 +128,35 @@ async def rotate(
     except Exception:
         cleanup_work_dir(work_dir)
         raise
+
+
+@router.post("/remove-background")
+async def remove_background(
+    file: UploadFile = File(...),
+    edge_refinement: bool = Form(False),
+    background_color: str | None = Form(None),
+):
+    work_dir = create_work_dir()
+    try:
+        source = await input_image(file, work_dir)
+        stem = Path(safe_upload_name(file.filename, "image")).stem
+        out_name = f"{stem}-no-bg.png"
+        output = work_dir / out_name
+
+        async with _bg_semaphore:
+            w, h = await asyncio.to_thread(
+                process_remove_background,
+                source,
+                output,
+                edge_refinement,
+                background_color,
+            )
+
+        resp = result_file(work_dir, output, out_name)
+        resp.headers["X-Image-Width"] = str(w)
+        resp.headers["X-Image-Height"] = str(h)
+        return resp
+    except Exception:
+        cleanup_work_dir(work_dir)
+        raise
+

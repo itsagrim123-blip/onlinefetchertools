@@ -12,7 +12,9 @@ const categories = [
     { slug: "audio-extractor", name: "Extract Audio", description: "Pull an audio track from a video file for offline listening.", formats: "MP3 · WAV · M4A · OGG", icon: "audio" as const },
   ]},
   { name: "Image / Converter", accent: "from-blue-400/20", tools: [
+    { slug: "background-remover", name: "AI Background Remover", description: "Remove image backgrounds automatically and download transparent PNGs.", formats: "JPG · PNG · WebP", icon: "image" as const, featured: true },
     { slug: "jpg-to-png", name: "JPG to PNG", description: "Convert JPG images to clean, lossless PNG files.", formats: "JPG → PNG", icon: "image" as const },
+
     { slug: "png-to-jpg", name: "PNG to JPG", description: "Create compact JPG files from PNG images.", formats: "PNG → JPG", icon: "image" as const },
     { slug: "webp-to-jpg", name: "WebP to JPG", description: "Turn WebP images into widely compatible JPG files.", formats: "WebP → JPG", icon: "image" as const },
     { slug: "webp-to-png", name: "WebP to PNG", description: "Convert WebP files to lossless PNG images.", formats: "WebP → PNG", icon: "image" as const },

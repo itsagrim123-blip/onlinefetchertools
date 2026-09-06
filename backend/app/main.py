@@ -29,6 +29,10 @@ settings = get_settings()
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     _.state.started_at = time.monotonic()
     cleanup_service = CleanupService()
+    # Non-blocking warm up of the AI background remover model session
+    from app.services.background_remover import BackgroundRemoverService
+
+    asyncio.create_task(BackgroundRemoverService.get_instance().initialize())
     try:
         yield
     finally:
@@ -55,9 +59,12 @@ app.add_middleware(
         "Content-Type",
         "Content-Length",
         "X-Filename",
+        "X-Image-Width",
+        "X-Image-Height",
         "Cache-Control",
     ],
 )
+
 
 app.include_router(health_router)
 app.include_router(media_router)

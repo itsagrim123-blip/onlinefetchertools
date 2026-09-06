@@ -242,9 +242,61 @@ const toolEndpoints: Record<string, string> = {
   "audio-extractor": "/api/media/extract-audio",
   "zip-creator": "/api/file/create-zip",
   "zip-extractor": "/api/file/extract-zip",
+  "background-remover": "/api/image/remove-background",
 };
 
 import { normalizeBlob, parseFilename, resolveMimeType } from "./download";
+
+export type RemoveBackgroundOptions = {
+  edgeRefinement?: boolean;
+  backgroundColor?: string;
+};
+
+export async function removeImageBackground(
+  file: File,
+  options?: RemoveBackgroundOptions
+): Promise<{ blob: Blob; filename: string; width?: number; height?: number }> {
+  const form = new FormData();
+  form.append("file", file);
+  if (options?.edgeRefinement) {
+    form.append("edge_refinement", "true");
+  }
+  if (options?.backgroundColor && options.backgroundColor !== "transparent") {
+    form.append("background_color", options.backgroundColor);
+  }
+
+  const stem = file.name.replace(/\.[^/.]+$/, "");
+  const fallbackFilename = `${stem}-no-bg.png`;
+
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl("/api/image/remove-background"), {
+      method: "POST",
+      body: form,
+    });
+  } catch {
+    throw new Error("Unable to reach the Online Fetcher Tools backend. Please check your connection or server status.");
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({ detail: "Background removal failed" }))) as ApiError;
+    throw new Error(getApiErrorMessage(errorBody));
+  }
+
+  const contentType = response.headers.get("content-type");
+  const filename = parseFilename(response.headers, fallbackFilename);
+  const rawBlob = await response.blob();
+  const mimeType = resolveMimeType(contentType, filename, "image/png");
+  const blob = normalizeBlob(rawBlob, mimeType);
+
+  const wHeader = response.headers.get("x-image-width");
+  const hHeader = response.headers.get("x-image-height");
+  const width = wHeader ? parseInt(wHeader, 10) : undefined;
+  const height = hHeader ? parseInt(hHeader, 10) : undefined;
+
+  return { blob, filename, width, height };
+}
+
 
 export async function runFileTool(
   slug: string,

@@ -5,6 +5,7 @@ import { VideoEditorWorkspace } from "@/components/tools/VideoEditorWorkspace";
 import { PdfPageManagerWorkspace } from "@/components/tools/PdfPageManagerWorkspace";
 import { PhotoEditorWorkspace } from "@/components/tools/PhotoEditorWorkspace";
 import { ZipExtractorWorkspace } from "@/components/tools/ZipExtractorWorkspace";
+import { BackgroundRemoverWorkspace } from "@/components/tools/BackgroundRemoverWorkspace";
 import { DownloaderCard } from "@/components/DownloaderCard";
 import { BackendStatus } from "@/components/BackendStatus";
 
@@ -16,6 +17,7 @@ const toolTitles: Record<string, string> = {
   "image-resizer": "Image Resizer",
   "image-cropper": "Image Cropper",
   "image-rotator": "Image Rotator",
+  "background-remover": "AI Background Remover",
   "jpg-to-png": "JPG to PNG",
   "png-to-jpg": "PNG to JPG",
   "webp-to-jpg": "WebP to JPG",
@@ -50,6 +52,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
   const isPdfManager = slug === "pdf-page-manager";
   const isPhotoEditor = slug === "image-cropper" || slug === "image-rotator";
   const isZipExtractor = slug === "zip-extractor";
+  const isBackgroundRemover = slug === "background-remover";
 
   if (isVideoEditor) {
     return (
@@ -82,6 +85,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
               ? "Fine-tune images with precise cropping, rotation, flipping, and quality controls."
               : isZipExtractor
               ? "Safely inspect ZIP archive contents and extract files with full path-traversal protection."
+              : isBackgroundRemover
+              ? "Remove the background from your image automatically and download a transparent PNG."
               : "A focused, privacy-friendly utility that processes your files through the Online Fetcher Tools backend."}
           </p>
         </div>
@@ -95,9 +100,12 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           <PhotoEditorWorkspace slug={slug} />
         ) : isZipExtractor ? (
           <ZipExtractorWorkspace />
+        ) : isBackgroundRemover ? (
+          <BackgroundRemoverWorkspace />
         ) : (
           <FileToolWorkspace slug={slug} />
         )}
+
         <div className="mx-auto mt-8 flex max-w-4xl items-center justify-center gap-2 text-xs text-slate-500">
           <ShieldCheck className="h-4 w-4 text-emerald-300" /> Files are processed temporarily and cleaned up after delivery.
         </div>

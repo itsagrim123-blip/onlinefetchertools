@@ -119,3 +119,32 @@ def rotate_image(
         image.save(output, "WEBP", quality=max(1, min(100, quality)), method=6)
     else:
         image.save(output, "PNG", optimize=True)
+
+
+def process_remove_background(
+    source: Path,
+    output: Path,
+    edge_refinement: bool = False,
+    background_color: str | None = None,
+) -> tuple[int, int]:
+    image = open_image(source)
+    width, height = image.size
+
+    if width > 5000 or height > 5000:
+        raise ClipFetchError(
+            f"Image dimensions ({width}x{height} px) exceed the maximum supported limit (5000x5000 px)",
+            status_code=400,
+        )
+
+    from app.services.background_remover import BackgroundRemoverService
+
+    service = BackgroundRemoverService.get_instance()
+    result = service.remove_background_sync(
+        image,
+        alpha_matting=edge_refinement,
+        background_color=background_color,
+    )
+
+    result.save(output, "PNG", optimize=True)
+    return result.width, result.height
+
