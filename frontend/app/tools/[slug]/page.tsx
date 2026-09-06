@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ChevronLeft, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Clock, ShieldCheck } from "lucide-react";
 import { FileToolWorkspace } from "@/components/tools/FileToolWorkspace";
+
 import { VideoEditorWorkspace } from "@/components/tools/VideoEditorWorkspace";
 import { PdfPageManagerWorkspace } from "@/components/tools/PdfPageManagerWorkspace";
 import { PhotoEditorWorkspace } from "@/components/tools/PhotoEditorWorkspace";
@@ -69,8 +70,22 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-cyan-300">
             <ChevronLeft className="h-4 w-4" /> All tools
           </Link>
-          <BackendStatus />
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
+              <Clock className="h-3 w-3 text-cyan-400 shrink-0" />
+              <span className="text-slate-400">Server:</span>
+              <span className="font-medium text-white">7:30 PM – 12:00 AM IST</span>
+            </div>
+            <BackendStatus />
+          </div>
         </div>
+        {/* Mobile Server Running Time */}
+        <div className="flex sm:hidden items-center justify-center gap-1.5 mt-2.5 rounded-full border border-white/5 bg-slate-900/60 py-1 px-3 text-[10px] text-slate-300">
+          <Clock className="h-3 w-3 text-cyan-400 shrink-0" />
+          <span className="text-slate-400">Server Running Time:</span>
+          <span className="font-medium text-white">7:30 PM – 12:00 AM IST</span>
+        </div>
+
         <div className="mx-auto max-w-4xl pb-6 pt-6 text-center sm:pb-10 sm:pt-16">
           <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Online Fetcher Tools utility</p>
           <h1 className="mt-2 sm:mt-4 text-2xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">{title}</h1>

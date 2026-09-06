@@ -36,6 +36,10 @@ export function Header() {
               <Link href="/tools/image-cropper" className="rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-300 hover:bg-white/5 hover:text-white">Photo Editor</Link>
               <Link href="/tools/pdf-merge" className="rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-300 hover:bg-white/5 hover:text-white">PDF Tools</Link>
               <Link href="/tools/zip-creator" className="rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-300 hover:bg-white/5 hover:text-white">File &amp; Archive</Link>
+              <div className="mt-1 border-t border-white/10 pt-2 px-3 py-1 text-[11px] text-slate-400 flex items-center gap-1.5">
+                <Clock className="h-3 w-3 text-cyan-400 shrink-0" />
+                <span>Server: 7:30 PM – 12:00 AM IST</span>
+              </div>
             </div>
           </details>
           <ThemeToggle />
@@ -49,6 +53,14 @@ export function Header() {
           </a>
         </div>
       </div>
+
+      {/* Mobile Server Running Time banner */}
+      <div className="flex md:hidden items-center justify-center gap-1.5 border-t border-white/5 bg-slate-950/90 py-1.5 px-3 text-[11px] text-slate-300">
+        <Clock className="h-3 w-3 text-cyan-400 shrink-0" />
+        <span className="text-slate-400">Server Running Time:</span>
+        <span className="font-semibold text-white">7:30 PM – 12:00 AM IST</span>
+      </div>
     </header>
   );
 }
+
