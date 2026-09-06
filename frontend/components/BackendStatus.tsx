@@ -19,11 +19,11 @@ export function BackendStatus() {
       role="status"
       aria-live="polite"
       title={tooltipText}
-      className="inline-flex h-9 min-w-0 sm:min-w-[184px] items-center justify-between gap-1.5 sm:gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 sm:px-3 text-xs font-medium text-slate-200 backdrop-blur-xl transition-colors shrink-0"
+      className="inline-flex h-8 sm:h-9 min-w-0 sm:min-w-[184px] items-center justify-between gap-1 sm:gap-2 rounded-full border border-white/10 bg-white/5 px-2 sm:px-3 text-[11px] sm:text-xs font-medium text-slate-200 backdrop-blur-md transition-colors shrink-0"
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
         {status === "checking" ? (
-          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-cyan-400" />
+          <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0 animate-spin text-cyan-400" />
         ) : status === "online" ? (
           <span className="relative flex h-2 w-2 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
@@ -34,7 +34,7 @@ export function BackendStatus() {
         )}
 
         <span
-          className={`truncate select-none ${
+          className={`truncate select-none text-[10px] sm:text-xs ${
             status === "online"
               ? "text-emerald-300 font-medium"
               : status === "offline"
@@ -65,10 +65,10 @@ export function BackendStatus() {
           onClick={checkStatus}
           disabled={isChecking}
           aria-label="Retry connection to backend"
-          className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-200 transition hover:border-rose-400 hover:bg-rose-500/25 active:scale-95 disabled:pointer-events-none disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/15 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-rose-200 transition hover:border-rose-400 hover:bg-rose-500/25 active:scale-95 disabled:pointer-events-none disabled:opacity-50"
         >
           <RotateCcw className={`h-2.5 w-2.5 ${isChecking ? "animate-spin" : ""}`} />
-          <span>Retry</span>
+          <span className="hidden xs:inline sm:inline">Retry</span>
         </button>
       ) : null}
     </div>

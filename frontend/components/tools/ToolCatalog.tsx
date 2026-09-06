@@ -45,14 +45,14 @@ const categories = [
 export function ToolCatalog() {
   const [query, setQuery] = useState("");
   return (
-    <div className="space-y-10 sm:space-y-16">
-      <label className="mx-auto flex h-12 sm:h-14 max-w-xl items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 text-left shadow-2xl shadow-cyan-950/20">
-        <Search className="h-5 w-5 text-slate-500" />
+    <div className="space-y-10 sm:space-y-16 w-full max-w-full">
+      <label className="mx-auto flex h-12 sm:h-14 max-w-xl w-full items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 text-left shadow-2xl shadow-cyan-950/20">
+        <Search className="h-5 w-5 text-slate-500 shrink-0" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search tools..."
-          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+          className="w-full min-w-0 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
           aria-label="Search tools"
         />
       </label>
@@ -62,13 +62,13 @@ export function ToolCatalog() {
         );
         if (!tools.length) return null;
         return (
-          <section key={category.name}>
-            <div className="mb-5 flex items-end justify-between">
-              <div>
+          <section key={category.name} className="catalog-section w-full max-w-full">
+            <div className="mb-5 flex items-end justify-between gap-2">
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Explore</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">{category.name}</h2>
+                <h2 className="mt-2 text-2xl font-semibold text-white truncate">{category.name}</h2>
               </div>
-              <span className="text-xs text-slate-500">{tools.length} tools</span>
+              <span className="text-xs text-slate-500 shrink-0">{tools.length} tools</span>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {tools.map((tool) => (

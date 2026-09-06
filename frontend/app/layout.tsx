@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { BackendStatusProvider } from "@/components/BackendStatusProvider";
@@ -19,11 +19,19 @@ export const metadata: Metadata = {
   description: "Download, convert, compress and manage files and media in one place.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#020817",
+};
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full w-full max-w-full overflow-x-hidden antialiased`}
       suppressHydrationWarning
     >
       <head>
@@ -50,7 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           }}
         />
       </head>
-      <body className="min-h-full bg-slate-950 text-slate-100 transition-colors duration-200">
+      <body className="min-h-full w-full max-w-full overflow-x-hidden bg-slate-950 text-slate-100 transition-colors duration-200">
         <ThemeProvider>
           <BackendStatusProvider>{children}</BackendStatusProvider>
         </ThemeProvider>

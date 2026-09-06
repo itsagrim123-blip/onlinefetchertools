@@ -14,13 +14,30 @@
 
 html {
   scroll-behavior: smooth;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Eliminate horizontal drag panning on touch devices */
+html,
+body,
+main {
+  overscroll-behavior-x: none;
 }
 
 * {
@@ -28,13 +45,37 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
+  touch-action: manipulation;
 }
 
 img {
   display: block;
   max-width: 100%;
+  height: auto;
+}
+
+/* Mobile & Low-end device performance optimizations */
+@media (max-width: 640px) {
+  header.backdrop-blur-xl,
+  header.backdrop-blur-md {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    background-color: rgba(2, 8, 23, 0.95) !important;
+  }
+
+  html.light header.backdrop-blur-xl,
+  html.light header.backdrop-blur-md {
+    background-color: rgba(255, 255, 255, 0.96) !important;
+  }
+}
+
+.catalog-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 420px;
 }
 
 @media (prefers-reduced-motion: reduce) {
