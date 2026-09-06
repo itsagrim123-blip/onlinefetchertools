@@ -5,10 +5,14 @@ import {
   ActiveToolTab,
   AspectRatioPreset,
   AudioTrackItem,
+  ClipPropertyTab,
   MediaAsset,
   MediaType,
+  MobileSheetType,
   OverlayLayerItem,
+  SidebarTab,
   TextLayerItem,
+  TrackControls,
   VideoClip,
   VideoProject,
 } from "../types";
@@ -91,7 +95,11 @@ export function useProjectState(initial?: VideoProject) {
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveToolTab>("media");
+
+  // Reference UI navigation states
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("media");
+  const [clipTab, setClipTab] = useState<ClipPropertyTab>("video");
+  const [mobileSheet, setMobileSheet] = useState<MobileSheetType>(null);
   const [timelineZoom, setTimelineZoom] = useState<number>(50); // pixels per second
 
   // Computed ranges & total duration
@@ -134,6 +142,39 @@ export function useProjectState(initial?: VideoProject) {
     });
   }, []);
 
+  // --- Track Controls (Visibility / Lock) ---
+  const toggleTrackVisibility = useCallback(
+    (track: keyof TrackControls) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        trackControls: {
+          ...prev.trackControls,
+          [track]: {
+            ...prev.trackControls[track],
+            visible: !prev.trackControls[track].visible,
+          },
+        },
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
+  const toggleTrackLock = useCallback(
+    (track: keyof TrackControls) => {
+      updateProjectWithHistory((prev) => ({
+        ...prev,
+        trackControls: {
+          ...prev.trackControls,
+          [track]: {
+            ...prev.trackControls[track],
+            locked: !prev.trackControls[track].locked,
+          },
+        },
+      }));
+    },
+    [updateProjectWithHistory]
+  );
+
   // --- Asset Management ---
   const addAsset = useCallback(
     (
@@ -142,7 +183,8 @@ export function useProjectState(initial?: VideoProject) {
       duration: number = 3.0,
       width?: number,
       height?: number,
-      thumbnailUrl?: string
+      thumbnailUrl?: string,
+      filmstripFrames?: string[]
     ): MediaAsset => {
       const id = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const objectUrl = URL.createObjectURL(file);
@@ -156,6 +198,7 @@ export function useProjectState(initial?: VideoProject) {
         width,
         height,
         thumbnailUrl,
+        filmstripFrames,
         size: file.size,
       };
 
@@ -205,7 +248,7 @@ export function useProjectState(initial?: VideoProject) {
         }
 
         setSelectedClipId(newClip.id);
-        setActiveTab("edit");
+        setClipTab("video");
 
         return {
           ...prev,
@@ -351,6 +394,60 @@ export function useProjectState(initial?: VideoProject) {
     [updateProjectWithHistory]
   );
 
+  // Freeze Frame: splits current clip and inserts still frame
+  const insertFreezeFrame = useCallback(
+    (clipId: string, timelineTime: number, frameDataUrl?: string, freezeDuration: number = 3.0) => {
+      const fallbackDataUrl =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+      const safeDataUrl = frameDataUrl || fallbackDataUrl;
+      // Create synthetic blob and file from safeDataUrl
+      try {
+        const byteString = atob(safeDataUrl.split(",")[1]);
+        const mimeString = safeDataUrl.split(",")[0].split(":")[1].split(";")[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: mimeString });
+        const file = new File([blob], `freeze_${Date.now()}.png`, { type: mimeString });
+        const asset = addAsset(file, "image", freezeDuration, undefined, undefined, safeDataUrl);
+
+        updateProjectWithHistory((prev) => {
+          const ranges = computeClipTimeRanges(prev.clips);
+          const target = ranges.find((r) => r.clip.id === clipId);
+          if (!target) return prev;
+
+          const { clip, startTime, index } = target;
+          const elapsed = Math.max(0, timelineTime - startTime);
+          const splitOffset = clip.startTrim + elapsed * (clip.speed || 1.0);
+
+          const clipA: VideoClip = { ...clip, endTrim: splitOffset };
+          const freezeClip: VideoClip = {
+            ...createDefaultClip(asset),
+            name: `${clip.name} (Freeze)`,
+            sourceDuration: freezeDuration,
+            startTrim: 0,
+            endTrim: freezeDuration,
+          };
+          const clipB: VideoClip = {
+            ...clip,
+            id: `clip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            startTrim: splitOffset,
+          };
+
+          const newClips = [...prev.clips];
+          newClips.splice(index, 1, clipA, freezeClip, clipB);
+          setSelectedClipId(freezeClip.id);
+          return { ...prev, clips: newClips };
+        });
+      } catch (err) {
+        console.error("Failed to insert freeze frame:", err);
+      }
+    },
+    [addAsset, updateProjectWithHistory]
+  );
+
   // --- Audio Track Operations ---
   const addAudioTrack = useCallback(
     (assetId: string, timelineStart: number = 0) => {
@@ -359,7 +456,7 @@ export function useProjectState(initial?: VideoProject) {
         if (!asset) return prev;
         const newTrack = createDefaultAudioTrack(asset, timelineStart);
         setSelectedAudioId(newTrack.id);
-        setActiveTab("audio");
+        setSidebarTab("audio");
         return {
           ...prev,
           audioTracks: [...prev.audioTracks, newTrack],
@@ -392,13 +489,13 @@ export function useProjectState(initial?: VideoProject) {
 
   // --- Text Layer Operations ---
   const addTextLayer = useCallback(
-    (timelineStart?: number, text: string = "Sample Text") => {
+    (timelineStart?: number, text: string = "Happy Birthday") => {
       const start = timelineStart !== undefined ? timelineStart : currentTime;
       updateProjectWithHistory((prev) => {
-        const newLayer = createDefaultTextLayer(start, 3.0);
+        const newLayer = createDefaultTextLayer(start, 4.0);
         newLayer.text = text;
         setSelectedTextId(newLayer.id);
-        setActiveTab("text");
+        setSidebarTab("text");
         return {
           ...prev,
           textLayers: [...prev.textLayers, newLayer],
@@ -438,7 +535,7 @@ export function useProjectState(initial?: VideoProject) {
         if (!asset || asset.type === "audio") return prev;
         const newOverlay = createDefaultOverlay(asset, start);
         setSelectedOverlayId(newOverlay.id);
-        setActiveTab("overlay");
+        setSidebarTab("stickers");
         return {
           ...prev,
           overlayLayers: [...prev.overlayLayers, newOverlay],
@@ -529,7 +626,9 @@ export function useProjectState(initial?: VideoProject) {
     setSelectedAudioId(null);
     setSelectedTextId(null);
     setSelectedOverlayId(null);
-    if (id) setActiveTab("edit");
+    if (id) {
+      setClipTab("video");
+    }
   }, []);
 
   const selectAudio = useCallback((id: string | null) => {
@@ -537,7 +636,9 @@ export function useProjectState(initial?: VideoProject) {
     setSelectedClipId(null);
     setSelectedTextId(null);
     setSelectedOverlayId(null);
-    if (id) setActiveTab("audio");
+    if (id) {
+      setSidebarTab("audio");
+    }
   }, []);
 
   const selectText = useCallback((id: string | null) => {
@@ -545,7 +646,9 @@ export function useProjectState(initial?: VideoProject) {
     setSelectedClipId(null);
     setSelectedAudioId(null);
     setSelectedOverlayId(null);
-    if (id) setActiveTab("text");
+    if (id) {
+      setSidebarTab("text");
+    }
   }, []);
 
   const selectOverlay = useCallback((id: string | null) => {
@@ -553,7 +656,9 @@ export function useProjectState(initial?: VideoProject) {
     setSelectedClipId(null);
     setSelectedAudioId(null);
     setSelectedTextId(null);
-    if (id) setActiveTab("overlay");
+    if (id) {
+      setSidebarTab("stickers");
+    }
   }, []);
 
   return {
@@ -574,14 +679,20 @@ export function useProjectState(initial?: VideoProject) {
     selectAudio,
     selectText,
     selectOverlay,
-    activeTab,
-    setActiveTab,
+    sidebarTab,
+    setSidebarTab,
+    clipTab,
+    setClipTab,
+    mobileSheet,
+    setMobileSheet,
     timelineZoom,
     setTimelineZoom,
     canUndo: history.length > 0,
     canRedo: future.length > 0,
     undo,
     redo,
+    toggleTrackVisibility,
+    toggleTrackLock,
     addAsset,
     removeAsset,
     addClipFromAsset,
@@ -591,6 +702,7 @@ export function useProjectState(initial?: VideoProject) {
     reorderClips,
     splitClipAtTime,
     trimClip,
+    insertFreezeFrame,
     addAudioTrack,
     updateAudioTrack,
     removeAudioTrack,
@@ -604,4 +716,3 @@ export function useProjectState(initial?: VideoProject) {
     setProjectTitle,
   };
 }
-

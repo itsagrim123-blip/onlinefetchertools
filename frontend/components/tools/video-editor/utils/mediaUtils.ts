@@ -210,3 +210,70 @@ export function captureVideoFrame(
   }
 }
 
+export async function extractFilmstripFrames(
+  file: File,
+  frameCount: number = 6
+): Promise<string[]> {
+  if (!file.type.startsWith("video/")) return [];
+  const objectUrl = URL.createObjectURL(file);
+
+  return new Promise<string[]>((resolve) => {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.src = objectUrl;
+    video.muted = true;
+    video.playsInline = true;
+
+    const frames: string[] = [];
+    const canvas = document.createElement("canvas");
+    canvas.width = 96;
+    canvas.height = 54;
+    const ctx = canvas.getContext("2d");
+
+    let resolved = false;
+    const cleanup = () => {
+      if (!resolved) {
+        resolved = true;
+        video.remove();
+        URL.revokeObjectURL(objectUrl);
+        resolve(frames);
+      }
+    };
+
+    const timeout = setTimeout(cleanup, 6000);
+
+    video.onloadedmetadata = () => {
+      const dur = video.duration && !isNaN(video.duration) ? video.duration : 5;
+      const step = dur / (frameCount + 1);
+      let currentIdx = 1;
+
+      const seekNext = () => {
+        if (currentIdx <= frameCount) {
+          video.currentTime = currentIdx * step;
+        } else {
+          clearTimeout(timeout);
+          cleanup();
+        }
+      };
+
+      video.onseeked = () => {
+        if (ctx) {
+          try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            frames.push(canvas.toDataURL("image/jpeg", 0.6));
+          } catch {
+            // Ignore capture error
+          }
+        }
+        currentIdx++;
+        seekNext();
+      };
+
+      seekNext();
+    };
+
+    video.onerror = cleanup;
+  });
+}
+
+

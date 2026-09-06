@@ -10,6 +10,7 @@ export interface MediaAsset {
   width?: number;
   height?: number;
   thumbnailUrl?: string;
+  filmstripFrames?: string[]; // Multiple sample frames across duration for timeline filmstrips
   size: number;
 }
 
@@ -44,16 +45,32 @@ export interface VideoClip {
   flipVertical: boolean;
   offsetX: number;      // percentage offset (-50 to 50)
   offsetY: number;      // percentage offset (-50 to 50)
+  opacity: number;      // 0.0 to 1.0 (default 1.0)
+  cropPreset: "original" | "16:9" | "9:16" | "1:1" | "4:5" | "custom";
+
+  filmstripFrames?: string[];
 
   // Filters & Adjustments
-  filterPreset: string; // "original" | "warm" | "cool" | "vintage" | "bw" | "fade" | "bright" | "contrast"
+  filterPreset: FilterPreset | string;
   brightness: number;   // -100 to 100 (default 0)
   contrast: number;     // -100 to 100 (default 0)
   saturation: number;   // -100 to 100 (default 0)
+  exposure?: number;    // -100 to 100
+  temperature?: number; // -100 to 100
 
   // Transition to next clip
   transition?: ClipTransition;
 }
+
+export type FilterPreset =
+  | "original"
+  | "warm"
+  | "cool"
+  | "vintage"
+  | "bw"
+  | "fade"
+  | "bright"
+  | "contrast";
 
 export interface AudioTrackItem {
   id: string;
@@ -100,6 +117,13 @@ export interface OverlayLayerItem {
   rotation: number;       // 0 - 360
 }
 
+export interface TrackControls {
+  video: { visible: boolean; locked: boolean };
+  audio: { visible: boolean; locked: boolean };
+  text: { visible: boolean; locked: boolean };
+  overlay: { visible: boolean; locked: boolean };
+}
+
 export interface ProjectSettings {
   aspectRatio: AspectRatioPreset;
   canvasWidth: number;
@@ -116,6 +140,7 @@ export interface VideoProject {
   audioTracks: AudioTrackItem[];
   textLayers: TextLayerItem[];
   overlayLayers: OverlayLayerItem[];
+  trackControls: TrackControls;
 }
 
 export interface ExportSettings {
@@ -125,12 +150,34 @@ export interface ExportSettings {
   fps: number;
 }
 
-export type ActiveToolTab = 
-  | "media" 
-  | "edit" 
-  | "audio" 
-  | "text" 
-  | "overlay" 
-  | "filter" 
+export type SidebarTab =
+  | "media"
+  | "audio"
+  | "text"
+  | "stickers"
+  | "filters"
+  | "effects"
+  | "transitions"
+  | "captions"
+  | "settings";
+
+export type ClipPropertyTab = "video" | "audio" | "speed" | "adjust";
+
+export type MobileSheetType =
+  | null
+  | "media"
+  | "properties"
+  | "clip_edit"
+  | "audio"
+  | "text"
+  | "stickers"
+  | "filters"
+  | "adjust"
+  | "speed"
+  | "effects"
+  | "transitions"
+  | "captions"
+  | "settings"
   | "export";
 
+export type ActiveToolTab = SidebarTab;

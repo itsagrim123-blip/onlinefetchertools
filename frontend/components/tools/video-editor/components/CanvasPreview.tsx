@@ -33,6 +33,8 @@ interface CanvasPreviewProps {
   onTimeUpdate: (time: number) => void;
   onTogglePlay: () => void;
   onSeek: (time: number) => void;
+  onUpdateSettings?: (settings: Partial<import("../types").ProjectSettings>) => void;
+  onOpenSettings?: () => void;
 }
 
 export function CanvasPreview({
@@ -43,6 +45,8 @@ export function CanvasPreview({
   onTimeUpdate,
   onTogglePlay,
   onSeek,
+  onUpdateSettings,
+  onOpenSettings,
 }: CanvasPreviewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -51,6 +55,8 @@ export function CanvasPreview({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [frameFormat, setFrameFormat] = useState<"jpg" | "png">("jpg");
   const [capturedFrame, setCapturedFrame] = useState<{ url: string; name: string } | null>(null);
+  const [masterVolume, setMasterVolume] = useState<number>(1.0);
+  const [isMasterMuted, setIsMasterMuted] = useState<boolean>(false);
 
   const clipRanges = useMemo(() => computeClipTimeRanges(project.clips), [project.clips]);
   const activeClipInfo = useMemo(() => findClipAtTime(clipRanges, currentTime), [clipRanges, currentTime]);
@@ -91,14 +97,15 @@ export function CanvasPreview({
       audioEl.currentTime = Math.max(0, audioLocalTime);
     }
 
-    audioEl.volume = activeAudioTrack.isMuted ? 0 : Math.min(1, activeAudioTrack.volume);
+    const effectiveVol = isMasterMuted ? 0 : Math.min(1, (activeAudioTrack.isMuted ? 0 : activeAudioTrack.volume) * masterVolume);
+    audioEl.volume = effectiveVol;
 
     if (isPlaying) {
       audioEl.play().catch(() => {});
     } else {
       audioEl.pause();
     }
-  }, [activeAudioTrack, activeAudioAsset, currentTime, isPlaying]);
+  }, [activeAudioTrack, activeAudioAsset, currentTime, isPlaying, isMasterMuted, masterVolume]);
 
   // Sync video element playback & position
   useEffect(() => {
@@ -115,7 +122,8 @@ export function CanvasPreview({
     video.playbackRate = Math.max(0.25, Math.min(4.0, activeClipInfo.clip.speed || 1.0));
 
     // Set volume
-    video.volume = activeClipInfo.clip.isMuted ? 0 : Math.min(1, activeClipInfo.clip.volume);
+    const clipVol = activeClipInfo.clip.isMuted ? 0 : activeClipInfo.clip.volume;
+    video.volume = isMasterMuted ? 0 : Math.min(1, clipVol * masterVolume);
 
     // Sync seek
     const desiredSourceTime = activeClipInfo.localSourceTime;
@@ -128,7 +136,7 @@ export function CanvasPreview({
     } else {
       video.pause();
     }
-  }, [activeClipInfo, activeAsset, isPlaying]);
+  }, [activeClipInfo, activeAsset, isPlaying, isMasterMuted, masterVolume]);
 
   // Playhead update loop during playback
   useEffect(() => {
@@ -225,9 +233,9 @@ export function CanvasPreview({
       case "9:16":
         return { aspectRatio: "9/16", maxWidth: "270px" };
       case "1:1":
-        return { aspectRatio: "1/1", maxWidth: "440px" };
+        return { aspectRatio: "1/1", maxWidth: "420px" };
       case "4:5":
-        return { aspectRatio: "4/5", maxWidth: "360px" };
+        return { aspectRatio: "4/5", maxWidth: "350px" };
       case "16:9":
       default:
         return { aspectRatio: "16/9", maxWidth: "100%" };
@@ -275,16 +283,16 @@ export function CanvasPreview({
   return (
     <div
       ref={containerRef}
-      className="flex flex-col items-center w-full rounded-2xl border border-white/10 bg-slate-950/80 p-3 sm:p-4 text-white shadow-xl"
+      className="flex flex-col items-center w-full rounded-2xl border border-white/10 bg-slate-950/80 p-2.5 sm:p-3 text-white shadow-xl"
     >
       {/* Hidden audio element for background track */}
       <audio ref={bgAudioRef} preload="auto" className="hidden" />
 
       {/* Main Aspect Ratio Canvas Viewport */}
-      <div className="relative w-full flex items-center justify-center bg-black/90 rounded-xl overflow-hidden min-h-[260px] sm:min-h-[380px] max-h-[460px] border border-white/5">
+      <div className="relative w-full flex items-center justify-center bg-black/90 rounded-xl overflow-hidden min-h-[240px] sm:min-h-[340px] max-h-[420px] border border-white/5">
         <div
           style={aspectRatioStyle}
-          className="relative w-full h-full max-h-[460px] flex items-center justify-center overflow-hidden bg-black"
+          className="relative w-full h-full max-h-[420px] flex items-center justify-center overflow-hidden bg-black"
         >
           {/* Active Clip Video or Image */}
           {activeClipInfo && activeAsset ? (
@@ -292,10 +300,11 @@ export function CanvasPreview({
               <video
                 ref={videoRef}
                 playsInline
-                muted={activeClipInfo.clip.isMuted}
+                muted={activeClipInfo.clip.isMuted || isMasterMuted}
                 style={{
                   filter: filterStyle,
                   transform: transformStyle,
+                  opacity: activeClipInfo.clip.opacity ?? 1.0,
                   transition: "filter 0.1s ease, transform 0.1s ease",
                 }}
                 className="w-full h-full object-contain pointer-events-none"
@@ -308,6 +317,7 @@ export function CanvasPreview({
                 style={{
                   filter: filterStyle,
                   transform: transformStyle,
+                  opacity: activeClipInfo.clip.opacity ?? 1.0,
                   transition: "filter 0.1s ease, transform 0.1s ease",
                 }}
                 className="w-full h-full object-contain pointer-events-none"
@@ -384,69 +394,138 @@ export function CanvasPreview({
           <button
             type="button"
             onClick={onTogglePlay}
-            className="absolute inset-0 m-auto h-16 w-16 flex items-center justify-center rounded-full bg-cyan-400/90 text-slate-950 shadow-2xl hover:scale-105 transition active:scale-95"
+            className="absolute inset-0 m-auto h-14 w-14 flex items-center justify-center rounded-full bg-cyan-400/90 text-slate-950 shadow-2xl hover:scale-105 transition active:scale-95"
             title="Play"
           >
-            <Play className="h-7 w-7 fill-current translate-x-0.5" />
+            <Play className="h-6 w-6 fill-current translate-x-0.5" />
           </button>
         )}
       </div>
 
-      {/* Playback Controls & Frame Extractor Bar */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 w-full border-t border-white/10 pt-3">
-        {/* Left: Playback controls */}
-        <div className="flex items-center gap-1 sm:gap-2">
+      {/* Scrubber Line directly beneath Video (matching reference image) */}
+      <div className="mt-2.5 flex items-center gap-2.5 w-full px-1">
+        <button
+          type="button"
+          onClick={onTogglePlay}
+          className="h-7 w-7 shrink-0 flex items-center justify-center rounded-lg bg-white/5 hover:bg-cyan-400/20 text-slate-300 hover:text-cyan-300 transition"
+          title={isPlaying ? "Pause" : "Play"}
+        >
+          {isPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current ml-0.5" />}
+        </button>
+
+        <div className="font-mono text-[11px] text-slate-300 shrink-0">
+          <span className="text-cyan-300 font-bold">{formatTimecode(currentTime)}</span>
+          <span className="text-slate-500 mx-1">/</span>
+          <span>{formatTimecode(totalDuration)}</span>
+        </div>
+
+        {/* Scrubber Range Slider */}
+        <input
+          type="range"
+          min={0}
+          max={Math.max(0.1, totalDuration)}
+          step={0.05}
+          value={currentTime}
+          onChange={(e) => onSeek(parseFloat(e.target.value))}
+          className="flex-1 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none"
+        />
+
+        {/* Aspect Ratio Selector Dropdown */}
+        {onUpdateSettings && (
+          <select
+            value={project.settings.aspectRatio}
+            onChange={(e) => onUpdateSettings({ aspectRatio: e.target.value as AspectRatioPreset })}
+            className="h-7 rounded-lg border border-white/10 bg-slate-900 px-2 text-[11px] font-semibold text-cyan-300 focus:border-cyan-400 focus:outline-none cursor-pointer shrink-0"
+            title="Canvas Aspect Ratio"
+          >
+            <option value="9:16">9:16 Portrait</option>
+            <option value="16:9">16:9 Landscape</option>
+            <option value="1:1">1:1 Square</option>
+            <option value="4:5">4:5 Social</option>
+          </select>
+        )}
+
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="h-7 w-7 shrink-0 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
+          title="Fullscreen Preview"
+        >
+          {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+
+      {/* Secondary Playback Strip: Skip, Step, Master Volume, Capture Frame */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 w-full border-t border-white/5 pt-2 px-1">
+        {/* Playback step buttons */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onSeek(0)}
+            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition text-xs"
+            title="Jump to Start"
+          >
+            |◀
+          </button>
           <button
             type="button"
             onClick={() => onSeek(Math.max(0, currentTime - 1.0))}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
-            title="Seek Backward 1s"
+            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
+            title="Seek Back 1s"
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-3 w-3" />
           </button>
-
-          <button
-            type="button"
-            onClick={onTogglePlay}
-            disabled={totalDuration <= 0}
-            className="inline-flex h-10 px-4 items-center justify-center gap-2 rounded-xl bg-cyan-400 font-semibold text-slate-950 hover:bg-cyan-300 transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            {isPlaying ? (
-              <>
-                <Pause className="h-4 w-4 fill-current" /> Pause
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 fill-current" /> Play
-              </>
-            )}
-          </button>
-
           <button
             type="button"
             onClick={() => onSeek(Math.min(totalDuration, currentTime + 1.0))}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
+            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
             title="Seek Forward 1s"
           >
-            <RotateCw className="h-4 w-4" />
+            <RotateCw className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSeek(totalDuration)}
+            className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition text-xs"
+            title="Jump to End"
+          >
+            ▶|
           </button>
 
-          <div className="ml-2 font-mono text-xs text-slate-300">
-            <span className="text-cyan-300 font-bold">{formatTimecode(currentTime)}</span>
-            <span className="text-slate-500 mx-1">/</span>
-            <span>{formatTimecode(totalDuration)}</span>
-          </div>
+          <div className="h-4 w-px bg-white/10 mx-1" />
+
+          {/* Volume Mute & Slider */}
+          <button
+            type="button"
+            onClick={() => setIsMasterMuted(!isMasterMuted)}
+            className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition"
+            title={isMasterMuted ? "Unmute All" : "Mute All"}
+          >
+            {isMasterMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 text-cyan-300" />}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={isMasterMuted ? 0 : masterVolume}
+            onChange={(e) => {
+              setMasterVolume(parseFloat(e.target.value));
+              if (isMasterMuted) setIsMasterMuted(false);
+            }}
+            className="w-14 sm:w-20 h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-400"
+            title={`Preview Volume: ${Math.round((isMasterMuted ? 0 : masterVolume) * 100)}%`}
+          />
         </div>
 
-        {/* Right: Frame Extractor & Fullscreen */}
-        <div className="flex items-center gap-2">
-          {/* Frame Format Picker */}
-          <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-slate-900 p-1">
+        {/* Right side: Capture Frame & Settings */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-slate-900 p-0.5">
             <button
               type="button"
               onClick={() => setFrameFormat("jpg")}
-              className={`px-2 py-0.5 text-[11px] rounded-lg font-medium transition ${
-                frameFormat === "jpg" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
+              className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition ${
+                frameFormat === "jpg" ? "bg-cyan-400 text-slate-950 font-bold" : "text-slate-400 hover:text-white"
               }`}
             >
               JPG
@@ -454,8 +533,8 @@ export function CanvasPreview({
             <button
               type="button"
               onClick={() => setFrameFormat("png")}
-              className={`px-2 py-0.5 text-[11px] rounded-lg font-medium transition ${
-                frameFormat === "png" ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:text-white"
+              className={`px-1.5 py-0.5 text-[10px] rounded font-medium transition ${
+                frameFormat === "png" ? "bg-cyan-400 text-slate-950 font-bold" : "text-slate-400 hover:text-white"
               }`}
             >
               PNG
@@ -466,20 +545,11 @@ export function CanvasPreview({
             type="button"
             onClick={handleCaptureFrame}
             disabled={!activeClipInfo || activeClipInfo.clip.type !== "video"}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 text-xs font-semibold text-cyan-300 hover:bg-cyan-400/20 transition disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Capture current video frame"
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-400/20 transition disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Capture Video Frame"
           >
-            <Camera className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Capture Frame</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition"
-            title="Toggle Fullscreen"
-          >
-            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            <Camera className="h-3 w-3" />
+            <span className="hidden sm:inline">Snapshot</span>
           </button>
         </div>
       </div>

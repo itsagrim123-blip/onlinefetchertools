@@ -38,6 +38,8 @@ class VideoClipModel(BaseModel):
     flip_vertical: bool = False
     offset_x: float = 0.0
     offset_y: float = 0.0
+    opacity: float = 1.0
+    crop_preset: str = "original"
 
     # Filters & Adjustments
     filter_preset: str = "original"

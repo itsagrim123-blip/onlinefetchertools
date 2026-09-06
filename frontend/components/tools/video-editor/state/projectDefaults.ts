@@ -29,6 +29,9 @@ export function createDefaultClip(asset: MediaAsset): VideoClip {
     flipVertical: false,
     offsetX: 0,
     offsetY: 0,
+    opacity: 1.0,
+    cropPreset: "original",
+    filmstripFrames: asset.filmstripFrames,
     filterPreset: "original",
     brightness: 0,
     contrast: 0,
@@ -113,6 +116,12 @@ export function createInitialProject(): VideoProject {
     audioTracks: [],
     textLayers: [],
     overlayLayers: [],
+    trackControls: {
+      video: { visible: true, locked: false },
+      audio: { visible: true, locked: false },
+      text: { visible: true, locked: false },
+      overlay: { visible: true, locked: false },
+    },
   };
 }
 

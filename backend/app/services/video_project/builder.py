@@ -203,6 +203,10 @@ def build_ffmpeg_command(
                 s_val = max(0.0, 1.0 + (clip.saturation / 100.0))
                 v_filters.append(f"eq=brightness={b_val:.3f}:contrast={c_val:.3f}:saturation={s_val:.3f}")
 
+            if clip.opacity < 1.0 and clip.opacity >= 0:
+                v_filters.append(f"format=rgba,colorchannelmixer=aa={clip.opacity:.2f}")
+
+
             # Ensure fixed framerate and format
             v_filters.append(f"fps={fps},format=yuv420p")
 

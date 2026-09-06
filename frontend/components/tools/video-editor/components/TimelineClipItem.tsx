@@ -96,12 +96,27 @@ export function TimelineClipItem({
           onSelect();
         }}
         style={{ width: `${widthPx}px` }}
-        className={`relative flex h-14 cursor-pointer items-center justify-between rounded-xl border px-2 text-xs transition select-none ${
+        className={`relative flex h-14 cursor-pointer items-center justify-between rounded-xl border px-2 text-xs transition select-none overflow-hidden ${
           isSelected
-            ? "border-cyan-400 bg-cyan-950/40 text-white ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/50"
-            : "border-white/10 bg-slate-900/80 text-slate-300 hover:border-white/30 hover:bg-slate-900"
+            ? "border-cyan-400 bg-cyan-950/50 text-white ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-950/50"
+            : "border-white/10 bg-slate-900/90 text-slate-300 hover:border-white/30 hover:bg-slate-900"
         }`}
       >
+        {/* Background Filmstrip Frames if available */}
+        {clip.filmstripFrames && clip.filmstripFrames.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none flex overflow-hidden opacity-30 group-hover:opacity-40 transition">
+            {clip.filmstripFrames.map((frameUrl, fIdx) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={fIdx}
+                src={frameUrl}
+                alt=""
+                className="h-full flex-1 object-cover border-r border-black/40 last:border-r-0"
+              />
+            ))}
+          </div>
+        )}
+
         {/* Left Trim Handle */}
         <div
           onMouseDown={(e) => {
@@ -113,26 +128,26 @@ export function TimelineClipItem({
             handleStartTrimDrag(e.touches[0].clientX, "start");
           }}
           title="Drag to trim start"
-          className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize flex items-center justify-center rounded-l-xl bg-white/5 hover:bg-cyan-400/30 transition group-hover:bg-white/10"
+          className="absolute left-0 top-0 bottom-0 w-3 z-10 cursor-ew-resize flex items-center justify-center rounded-l-xl bg-white/5 hover:bg-cyan-400/40 transition group-hover:bg-white/10"
         >
           <div className="h-4 w-0.5 rounded-full bg-slate-400 group-hover:bg-cyan-300" />
         </div>
 
         {/* Clip Content Details */}
-        <div className="flex-1 min-w-0 px-2 overflow-hidden">
-          <p className="truncate font-medium text-[11px] text-slate-200" title={clip.name}>
+        <div className="relative z-10 flex-1 min-w-0 px-2 overflow-hidden drop-shadow">
+          <p className="truncate font-semibold text-[11px] text-slate-100" title={clip.name}>
             {clip.name}
           </p>
-          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-300 font-mono mt-0.5">
             <span className="text-cyan-300 font-semibold">{effectiveDuration.toFixed(1)}s</span>
             {clip.speed !== 1.0 && (
-              <span className="inline-flex items-center text-amber-300 bg-amber-400/10 px-1 rounded">
+              <span className="inline-flex items-center text-amber-300 bg-amber-400/20 px-1 rounded backdrop-blur-sm">
                 <FastForward className="h-2.5 w-2.5 mr-0.5" />
                 {clip.speed}x
               </span>
             )}
             {clip.isReversed && (
-              <span className="inline-flex items-center text-pink-300 bg-pink-400/10 px-1 rounded">
+              <span className="inline-flex items-center text-pink-300 bg-pink-400/20 px-1 rounded backdrop-blur-sm">
                 <RotateCcw className="h-2.5 w-2.5 mr-0.5" />
                 REV
               </span>
@@ -159,7 +174,7 @@ export function TimelineClipItem({
             handleStartTrimDrag(e.touches[0].clientX, "end");
           }}
           title="Drag to trim end"
-          className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize flex items-center justify-center rounded-r-xl bg-white/5 hover:bg-cyan-400/30 transition group-hover:bg-white/10"
+          className="absolute right-0 top-0 bottom-0 w-3 z-10 cursor-ew-resize flex items-center justify-center rounded-r-xl bg-white/5 hover:bg-cyan-400/40 transition group-hover:bg-white/10"
         >
           <div className="h-4 w-0.5 rounded-full bg-slate-400 group-hover:bg-cyan-300" />
         </div>
@@ -174,7 +189,7 @@ export function TimelineClipItem({
             onOpenTransitionModal();
           }}
           title={clip.transition ? `Transition: ${clip.transition.type}` : "Add Transition"}
-          className={`z-10 -ml-2 -mr-2 h-6 w-6 rounded-full border flex items-center justify-center transition shadow ${
+          className={`z-20 -ml-2 -mr-2 h-6 w-6 rounded-full border flex items-center justify-center transition shadow-md ${
             clip.transition && clip.transition.type !== "none"
               ? "border-cyan-400 bg-cyan-400 text-slate-950 hover:bg-cyan-300"
               : "border-white/20 bg-slate-800 text-slate-400 hover:border-cyan-400 hover:text-white"
