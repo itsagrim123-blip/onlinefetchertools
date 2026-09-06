@@ -56,10 +56,13 @@ export function computeClipTimeRanges(clips: VideoClip[]): ClipTimeRange[] {
   let fallbackOffset = 0;
   return clips.map((clip, index) => {
     const duration = getEffectiveClipDuration(clip);
-    const startTime = typeof clip.timelineStart === "number" ? Math.max(0, clip.timelineStart) : fallbackOffset;
+    const requestedStart =
+      typeof clip.timelineStart === "number" ? Math.max(0, clip.timelineStart) : fallbackOffset;
+    // Strictly prevent overlap with preceding clip
+    const startTime = Math.max(fallbackOffset, requestedStart);
     fallbackOffset = startTime + duration;
     return {
-      clip,
+      clip: { ...clip, timelineStart: startTime },
       index,
       startTime,
       endTime: startTime + duration,
@@ -84,9 +87,9 @@ export function findPlaybackStateAtTime(
     const transition = current.clip.transition;
 
     if (transition && transition.type !== "none" && transition.duration > 0) {
-      // Adjacent if current.endTime is within 0.15s of next.startTime
+      // Adjacent if current.endTime is within 0.25s of next.startTime
       const gap = next.startTime - current.endTime;
-      if (Math.abs(gap) <= 0.15) {
+      if (Math.abs(gap) <= 0.25) {
         const transDur = Math.min(transition.duration, current.duration * 0.8, next.duration * 0.8);
         const transStart = current.endTime - transDur;
         const transEnd = current.endTime;
@@ -99,11 +102,11 @@ export function findPlaybackStateAtTime(
             ? current.clip.endTrim - elapsedA * speedA
             : current.clip.startTrim + elapsedA * speedA;
 
-          const elapsedB = clampedTime - next.startTime;
+          const transElapsed = clampedTime - transStart;
           const speedB = Math.max(0.1, next.clip.speed || 1.0);
           const localB = next.clip.isReversed
-            ? next.clip.endTrim - Math.max(0, elapsedB) * speedB
-            : next.clip.startTrim + Math.max(0, elapsedB) * speedB;
+            ? next.clip.endTrim - transElapsed * speedB
+            : next.clip.startTrim + transElapsed * speedB;
 
           return {
             activeClipInfo: {
@@ -428,13 +431,27 @@ export function useProjectState(initial?: VideoProject) {
   const moveClip = useCallback(
     (clipId: string, newTimelineStart: number) => {
       updateProjectWithHistory((prev) => {
-        const target = prev.clips.find((c) => c.id === clipId);
-        if (!target) return prev;
-        const updated = prev.clips.map((c) =>
-          c.id === clipId ? { ...c, timelineStart: Math.max(0, newTimelineStart) } : c
+        const targetIndex = prev.clips.findIndex((c) => c.id === clipId);
+        if (targetIndex === -1) return prev;
+        const target = prev.clips[targetIndex];
+        const targetDur = getEffectiveClipDuration(target);
+
+        // Enforce strict boundaries with adjacent clips to prevent overlap
+        const prevClip = targetIndex > 0 ? prev.clips[targetIndex - 1] : undefined;
+        const nextClip = targetIndex < prev.clips.length - 1 ? prev.clips[targetIndex + 1] : undefined;
+
+        const minStart = prevClip
+          ? (prevClip.timelineStart || 0) + getEffectiveClipDuration(prevClip)
+          : 0;
+        const maxStart = nextClip
+          ? Math.max(minStart, (nextClip.timelineStart || 0) - targetDur)
+          : Infinity;
+
+        const clampedStart = Math.max(minStart, Math.min(maxStart, newTimelineStart));
+
+        const updated = prev.clips.map((c, i) =>
+          i === targetIndex ? { ...c, timelineStart: clampedStart } : c
         );
-        // Sort clips so they are sequential in order of timeline appearance
-        updated.sort((a, b) => (a.timelineStart || 0) - (b.timelineStart || 0));
 
         // Validate transitions between adjacent clips: if two clips moved apart, remove transition
         for (let i = 0; i < updated.length; i++) {
@@ -499,6 +516,7 @@ export function useProjectState(initial?: VideoProject) {
           timelineStart: time,
           startTrim: splitSourceOffset,
           endTrim: clip.endTrim,
+          transition: undefined,
         };
 
         const newClips = [...prev.clips];
@@ -517,20 +535,49 @@ export function useProjectState(initial?: VideoProject) {
 
   const trimClip = useCallback(
     (clipId: string, newStartTrim: number, newEndTrim: number, newTimelineStart?: number) => {
-      updateProjectWithHistory((prev) => ({
-        ...prev,
-        clips: prev.clips.map((clip) => {
-          if (clip.id !== clipId) return clip;
-          const safeStart = Math.max(0, Math.min(newStartTrim, clip.sourceDuration - 0.1));
-          const safeEnd = Math.max(safeStart + 0.1, Math.min(newEndTrim, clip.sourceDuration));
-          return {
-            ...clip,
-            startTrim: safeStart,
-            endTrim: safeEnd,
-            timelineStart: newTimelineStart !== undefined ? Math.max(0, newTimelineStart) : (clip.timelineStart || 0),
-          };
-        }),
-      }));
+      updateProjectWithHistory((prev) => {
+        const targetIndex = prev.clips.findIndex((c) => c.id === clipId);
+        if (targetIndex === -1) return prev;
+        const clip = prev.clips[targetIndex];
+        const prevClip = targetIndex > 0 ? prev.clips[targetIndex - 1] : undefined;
+        const nextClip = targetIndex < prev.clips.length - 1 ? prev.clips[targetIndex + 1] : undefined;
+
+        const minTimelineStart = prevClip
+          ? (prevClip.timelineStart || 0) + getEffectiveClipDuration(prevClip)
+          : 0;
+
+        const safeTimelineStart =
+          newTimelineStart !== undefined
+            ? Math.max(minTimelineStart, newTimelineStart)
+            : (clip.timelineStart || 0);
+
+        const safeStart = Math.max(0, Math.min(newStartTrim, clip.sourceDuration - 0.1));
+        let safeEnd = Math.max(safeStart + 0.1, Math.min(newEndTrim, clip.sourceDuration));
+
+        // If next clip exists, ensure clip end does not collide into nextClip.timelineStart
+        if (nextClip && typeof nextClip.timelineStart === "number") {
+          const maxDuration = Math.max(0.1, nextClip.timelineStart - safeTimelineStart);
+          const speed = Math.max(0.1, clip.speed || 1.0);
+          const maxSourceSpan = maxDuration * speed;
+          if (safeEnd - safeStart > maxSourceSpan) {
+            safeEnd = safeStart + maxSourceSpan;
+          }
+        }
+
+        return {
+          ...prev,
+          clips: prev.clips.map((c, i) =>
+            i === targetIndex
+              ? {
+                  ...c,
+                  startTrim: safeStart,
+                  endTrim: safeEnd,
+                  timelineStart: safeTimelineStart,
+                }
+              : c
+          ),
+        };
+      });
     },
     [updateProjectWithHistory]
   );

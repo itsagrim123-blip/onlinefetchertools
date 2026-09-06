@@ -1109,9 +1109,17 @@ export const Timeline = memo(function Timeline({
               ) : (
                 <>
                   {project.clips.map((clip, idx) => {
-                    const nextClip = project.clips[idx + 1];
-                    const clipEnd = (clip.timelineStart || 0) + getEffectiveClipDuration(clip);
-                    const isAdjacent = nextClip && Math.abs((nextClip.timelineStart || 0) - clipEnd) <= 0.2;
+                    const prevClip = idx > 0 ? project.clips[idx - 1] : undefined;
+                    const nextClip = idx < project.clips.length - 1 ? project.clips[idx + 1] : undefined;
+                    const prevClipEnd = prevClip
+                      ? (prevClip.timelineStart || 0) + getEffectiveClipDuration(prevClip)
+                      : 0;
+                    const nextClipStart = nextClip ? (nextClip.timelineStart || 0) : Infinity;
+                    const clipDur = getEffectiveClipDuration(clip);
+                    const minStartSec = prevClipEnd;
+                    const maxStartSec = nextClip ? Math.max(minStartSec, nextClipStart - clipDur) : Infinity;
+                    const clipEnd = (clip.timelineStart || 0) + clipDur;
+                    const isAdjacent = nextClip && Math.abs((nextClip.timelineStart || 0) - clipEnd) <= 0.25;
                     return (
                       <TimelineClipItem
                         key={clip.id}
@@ -1120,6 +1128,8 @@ export const Timeline = memo(function Timeline({
                         zoom={zoom}
                         snapPoints={snapPoints}
                         snapEnabled={project.settings.snapEnabled ?? true}
+                        minStartSec={minStartSec}
+                        maxStartSec={maxStartSec}
                         isSelected={selectedClipId === clip.id}
                         onSelect={() => {
                           if (!isVideoLocked) onSelectClip(clip.id);

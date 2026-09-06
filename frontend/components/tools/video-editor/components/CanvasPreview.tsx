@@ -179,21 +179,24 @@ export const CanvasPreview = memo(function CanvasPreview({
   const activeClipInfo = playbackState.activeClipInfo;
   const activeTransition = playbackState.activeTransition;
 
-  const activeAssetId = activeClipInfo?.clip.assetId;
-  const activeAsset: MediaAsset | undefined = useMemo(() => {
-    if (!activeAssetId) return undefined;
-    return project.assets.find((a) => a.id === activeAssetId);
-  }, [activeAssetId, project.assets]);
+  const primaryClip = activeTransition ? activeTransition.fromClip : activeClipInfo?.clip;
+  const secondaryClip = activeTransition ? activeTransition.toClip : null;
 
-  const fromAsset = useMemo(() => {
-    if (!activeTransition) return undefined;
-    return project.assets.find((a) => a.id === activeTransition.fromClip.assetId);
-  }, [activeTransition, project.assets]);
+  const primaryAsset: MediaAsset | undefined = useMemo(() => {
+    if (!primaryClip) return undefined;
+    return project.assets.find((a) => a.id === primaryClip.assetId);
+  }, [primaryClip?.assetId, project.assets]);
 
-  const toAsset = useMemo(() => {
-    if (!activeTransition) return undefined;
-    return project.assets.find((a) => a.id === activeTransition.toClip.assetId);
-  }, [activeTransition, project.assets]);
+  const secondaryAsset: MediaAsset | undefined = useMemo(() => {
+    if (!secondaryClip) return undefined;
+    return project.assets.find((a) => a.id === secondaryClip.assetId);
+  }, [secondaryClip?.assetId, project.assets]);
+
+  const primaryLocalTime = activeTransition
+    ? activeTransition.fromLocalTime
+    : (activeClipInfo?.localSourceTime ?? 0);
+
+  const secondaryLocalTime = activeTransition ? activeTransition.toLocalTime : 0;
 
   const transStyles = useMemo(() => {
     if (!activeTransition) return null;
@@ -213,90 +216,56 @@ export const CanvasPreview = memo(function CanvasPreview({
     return project.assets.find((a) => a.id === activeAudioAssetId);
   }, [activeAudioAssetId, project.assets]);
 
-  const currentVideoSrcRef = useRef<string | null>(null);
-  const secondaryVideoSrcRef = useRef<string | null>(null);
-  const currentClipIdRef = useRef<string | null>(null);
+  const primaryLocalTimeRef = useRef<number>(primaryLocalTime);
+  primaryLocalTimeRef.current = primaryLocalTime;
+  const secondaryLocalTimeRef = useRef<number>(secondaryLocalTime);
+  secondaryLocalTimeRef.current = secondaryLocalTime;
   const isPlayingRef = useRef<boolean>(isPlaying);
+  isPlayingRef.current = isPlaying;
 
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
+  const handlePrimaryLoadedData = () => {
+    const video = videoRef.current;
+    if (video && !isPlayingRef.current) {
+      if (Math.abs(video.currentTime - primaryLocalTimeRef.current) > 0.04) {
+        video.currentTime = primaryLocalTimeRef.current;
+      }
+    }
+  };
 
-  // 1. Sync Video/Audio Sources and Volumes (without forced seeks during playback)
+  const handleSecondaryLoadedData = () => {
+    const secVideo = secondaryVideoRef.current;
+    if (secVideo && !isPlayingRef.current) {
+      if (Math.abs(secVideo.currentTime - secondaryLocalTimeRef.current) > 0.04) {
+        secVideo.currentTime = secondaryLocalTimeRef.current;
+      }
+    }
+  };
+
+  // 1. Sync Video/Audio Playback Rates, Volumes, and Transitions
   useEffect(() => {
     const video = videoRef.current;
     const secVideo = secondaryVideoRef.current;
 
-    // Handle Active Transition between adjacent clips
-    if (activeTransition && fromAsset && toAsset) {
-      if (video && activeTransition.fromClip.type === "video") {
-        if (currentVideoSrcRef.current !== fromAsset.objectUrl) {
-          currentVideoSrcRef.current = fromAsset.objectUrl;
-          video.src = fromAsset.objectUrl;
-          video.currentTime = activeTransition.fromLocalTime;
-          if (isPlayingRef.current) video.play().catch(() => {});
-        }
-        currentClipIdRef.current = activeTransition.fromClip.id;
-        video.playbackRate = Math.max(0.25, Math.min(4.0, activeTransition.fromClip.speed || 1.0));
-        const fromVol = activeTransition.fromClip.isMuted ? 0 : activeTransition.fromClip.volume;
-        video.volume = isMasterMuted ? 0 : Math.min(1, fromVol * masterVolume * (1 - activeTransition.progress));
-      }
-
-      if (secVideo && activeTransition.toClip.type === "video") {
-        if (secondaryVideoSrcRef.current !== toAsset.objectUrl) {
-          secondaryVideoSrcRef.current = toAsset.objectUrl;
-          secVideo.src = toAsset.objectUrl;
-          secVideo.currentTime = activeTransition.toLocalTime;
-          if (isPlayingRef.current) secVideo.play().catch(() => {});
-        }
-        secVideo.playbackRate = Math.max(0.25, Math.min(4.0, activeTransition.toClip.speed || 1.0));
-        const toVol = activeTransition.toClip.isMuted ? 0 : activeTransition.toClip.volume;
-        secVideo.volume = isMasterMuted ? 0 : Math.min(1, toVol * masterVolume * activeTransition.progress);
-      }
-      return;
+    if (video && primaryClip && primaryAsset && primaryClip.type === "video") {
+      video.playbackRate = Math.max(0.25, Math.min(4.0, primaryClip.speed || 1.0));
+      const baseVol = primaryClip.isMuted ? 0 : (primaryClip.volume ?? 1.0);
+      const factor = activeTransition ? (1 - activeTransition.progress) : 1;
+      video.volume = isMasterMuted ? 0 : Math.min(1, baseVol * masterVolume * factor);
     }
 
-    // When not in transition, ensure secondary video is paused
-    if (secVideo && !secVideo.paused) {
+    if (secVideo && secondaryClip && secondaryAsset && secondaryClip.type === "video") {
+      secVideo.playbackRate = Math.max(0.25, Math.min(4.0, secondaryClip.speed || 1.0));
+      const baseVol = secondaryClip.isMuted ? 0 : (secondaryClip.volume ?? 1.0);
+      secVideo.volume = isMasterMuted ? 0 : Math.min(1, baseVol * masterVolume * (activeTransition?.progress ?? 1));
+    } else if (secVideo && !secVideo.paused) {
       secVideo.pause();
     }
-
-    // Normal active clip playback
-    if (!video || !activeClipInfo || !activeAsset || activeClipInfo.clip.type !== "video") {
-      if (video && !video.paused) {
-        video.pause();
-      }
-      return;
-    }
-
-    const isDifferentSrc = currentVideoSrcRef.current !== activeAsset.objectUrl;
-    const isDifferentClip = currentClipIdRef.current !== activeClipInfo.clip.id;
-
-    if (isDifferentSrc) {
-      currentVideoSrcRef.current = activeAsset.objectUrl;
-      video.src = activeAsset.objectUrl;
-      video.currentTime = activeClipInfo.localSourceTime;
-      if (isPlayingRef.current) {
-        video.play().catch(() => {});
-      }
-    } else if (isDifferentClip) {
-      video.currentTime = activeClipInfo.localSourceTime;
-    }
-
-    currentClipIdRef.current = activeClipInfo.clip.id;
-    video.playbackRate = Math.max(0.25, Math.min(4.0, activeClipInfo.clip.speed || 1.0));
-    const clipVol = activeClipInfo.clip.isMuted ? 0 : activeClipInfo.clip.volume;
-    video.volume = isMasterMuted ? 0 : Math.min(1, clipVol * masterVolume);
   }, [
-    activeClipInfo?.clip.id,
-    activeClipInfo?.localSourceTime,
-    activeAsset?.objectUrl,
-    activeClipInfo?.clip.speed,
-    activeClipInfo?.clip.volume,
-    activeClipInfo?.clip.isMuted,
+    primaryClip,
+    primaryAsset,
+    secondaryClip,
+    secondaryAsset,
     activeTransition,
-    fromAsset?.objectUrl,
-    toAsset?.objectUrl,
     isMasterMuted,
     masterVolume,
   ]);
@@ -308,46 +277,45 @@ export const CanvasPreview = memo(function CanvasPreview({
     const audio = bgAudioRef.current;
 
     if (isPlaying) {
-      if (activeTransition) {
-        if (video && activeTransition.fromClip.type === "video") video.play().catch(() => {});
-        if (secVideo && activeTransition.toClip.type === "video") secVideo.play().catch(() => {});
-      } else {
-        if (video && activeClipInfo?.clip.type === "video") {
-          video.play().catch(() => {});
-        }
+      if (video && primaryClip?.type === "video") {
+        video.play().catch(() => {});
+      }
+      if (activeTransition && secVideo && secondaryClip?.type === "video") {
+        secVideo.play().catch(() => {});
       }
       if (audio && activeAudioTrack && activeAudioAsset) {
         audio.play().catch(() => {});
       }
     } else {
-      if (video) video.pause();
-      if (secVideo) secVideo.pause();
-      if (audio) audio.pause();
+      if (video && !video.paused) video.pause();
+      if (secVideo && !secVideo.paused) secVideo.pause();
+      if (audio && !audio.paused) audio.pause();
     }
-  }, [isPlaying, activeClipInfo?.clip.type, activeTransition, activeAudioTrack, activeAudioAsset]);
+  }, [
+    isPlaying,
+    primaryClip?.type,
+    secondaryClip?.type,
+    activeTransition,
+    activeAudioTrack,
+    activeAudioAsset,
+  ]);
 
-  // 3. Seek Synchronization (ONLY when paused to completely eliminate playback stutter)
+  // 3. Seek Synchronization (ONLY when paused to eliminate playback stutter)
   useEffect(() => {
     if (isPlaying) return;
 
     const video = videoRef.current;
     const secVideo = secondaryVideoRef.current;
 
-    if (activeTransition) {
-      if (video && activeTransition.fromClip.type === "video") {
-        if (Math.abs(video.currentTime - activeTransition.fromLocalTime) > 0.05) {
-          video.currentTime = activeTransition.fromLocalTime;
-        }
+    if (video && primaryClip?.type === "video") {
+      if (Math.abs(video.currentTime - primaryLocalTime) > 0.04) {
+        video.currentTime = primaryLocalTime;
       }
-      if (secVideo && activeTransition.toClip.type === "video") {
-        if (Math.abs(secVideo.currentTime - activeTransition.toLocalTime) > 0.05) {
-          secVideo.currentTime = activeTransition.toLocalTime;
-        }
-      }
-    } else if (video && activeClipInfo && activeClipInfo.clip.type === "video") {
-      const desiredTime = activeClipInfo.localSourceTime;
-      if (Math.abs(video.currentTime - desiredTime) > 0.05) {
-        video.currentTime = desiredTime;
+    }
+
+    if (activeTransition && secVideo && secondaryClip?.type === "video") {
+      if (Math.abs(secVideo.currentTime - secondaryLocalTime) > 0.04) {
+        secVideo.currentTime = secondaryLocalTime;
       }
     }
 
@@ -363,15 +331,27 @@ export const CanvasPreview = memo(function CanvasPreview({
       const effectiveVol = isMasterMuted ? 0 : Math.min(1, (activeAudioTrack.isMuted ? 0 : activeAudioTrack.volume) * masterVolume);
       audio.volume = effectiveVol;
     }
-  }, [currentTime, isPlaying, activeClipInfo, activeTransition, activeAudioTrack, activeAudioAsset, isMasterMuted, masterVolume]);
+  }, [
+    currentTime,
+    isPlaying,
+    primaryClip?.type,
+    primaryLocalTime,
+    secondaryClip?.type,
+    secondaryLocalTime,
+    activeTransition,
+    activeAudioTrack,
+    activeAudioAsset,
+    isMasterMuted,
+    masterVolume,
+  ]);
 
   // Playback refs for uninterrupted, non-tearing 60fps RAF loop
   const currentTimeRef = useRef<number>(currentTime);
   currentTimeRef.current = currentTime;
   const activeClipInfoRef = useRef(activeClipInfo);
   activeClipInfoRef.current = activeClipInfo;
-  const activeAssetRef = useRef(activeAsset);
-  activeAssetRef.current = activeAsset;
+  const activeAssetRef = useRef(primaryAsset);
+  activeAssetRef.current = primaryAsset;
   const totalDurationRef = useRef<number>(totalDuration);
   totalDurationRef.current = totalDuration;
   const onTimeUpdateRef = useRef(onTimeUpdate);
@@ -462,80 +442,38 @@ export const CanvasPreview = memo(function CanvasPreview({
     return () => cancelAnimationFrame(animId);
   }, [isPlaying]);
 
-  const activeClip = activeClipInfo?.clip;
+  // Filter and Transform styles for Primary and Secondary layers
+  const primaryFilter = useMemo(
+    () => getClipFilter(primaryClip),
+    [primaryClip?.filterPreset, primaryClip?.brightness, primaryClip?.contrast, primaryClip?.saturation]
+  );
+  const primaryTransform = useMemo(
+    () => getClipTransform(primaryClip),
+    [
+      primaryClip?.scale,
+      primaryClip?.rotation,
+      primaryClip?.flipHorizontal,
+      primaryClip?.flipVertical,
+      primaryClip?.offsetX,
+      primaryClip?.offsetY,
+    ]
+  );
 
-  // CSS Filter string calculation - cached and only recalculated when visual filter settings change
-  const filterStyle = useMemo(() => {
-    if (!activeClip) return "none";
-    const parts: string[] = [];
-
-    // Presets
-    switch (activeClip.filterPreset) {
-      case "warm":
-        parts.push("sepia(0.3) saturate(1.2) hue-rotate(-10deg)");
-        break;
-      case "cool":
-        parts.push("hue-rotate(20deg) saturate(1.1)");
-        break;
-      case "vintage":
-        parts.push("sepia(0.6) contrast(1.1) brightness(0.9)");
-        break;
-      case "bw":
-        parts.push("grayscale(1)");
-        break;
-      case "fade":
-        parts.push("contrast(0.85) brightness(1.1)");
-        break;
-      case "bright":
-        parts.push("brightness(1.25) contrast(1.05)");
-        break;
-      case "contrast":
-        parts.push("contrast(1.3)");
-        break;
-      default:
-        break;
-    }
-
-    // Adjustments
-    if (activeClip.brightness !== 0) {
-      parts.push(`brightness(${1 + activeClip.brightness / 100})`);
-    }
-    if (activeClip.contrast !== 0) {
-      parts.push(`contrast(${1 + activeClip.contrast / 100})`);
-    }
-    if (activeClip.saturation !== 0) {
-      parts.push(`saturate(${1 + activeClip.saturation / 100})`);
-    }
-
-    return parts.length > 0 ? parts.join(" ") : "none";
-  }, [
-    activeClip?.filterPreset,
-    activeClip?.brightness,
-    activeClip?.contrast,
-    activeClip?.saturation,
-    activeClip?.id,
-  ]);
-
-  // CSS Transform string calculation - cached and only recalculated when transform values change
-  const transformStyle = useMemo(() => {
-    if (!activeClip) return "none";
-    const scale = activeClip.scale || 1.0;
-    const rot = activeClip.rotation || 0;
-    const flipX = activeClip.flipHorizontal ? -1 : 1;
-    const flipY = activeClip.flipVertical ? -1 : 1;
-    const offX = activeClip.offsetX || 0;
-    const offY = activeClip.offsetY || 0;
-
-    return `translate(${offX}%, ${offY}%) scale(${scale}) scale(${flipX}, ${flipY}) rotate(${rot}deg)`;
-  }, [
-    activeClip?.scale,
-    activeClip?.rotation,
-    activeClip?.flipHorizontal,
-    activeClip?.flipVertical,
-    activeClip?.offsetX,
-    activeClip?.offsetY,
-    activeClip?.id,
-  ]);
+  const secondaryFilter = useMemo(
+    () => getClipFilter(secondaryClip || undefined),
+    [secondaryClip?.filterPreset, secondaryClip?.brightness, secondaryClip?.contrast, secondaryClip?.saturation]
+  );
+  const secondaryTransform = useMemo(
+    () => getClipTransform(secondaryClip || undefined),
+    [
+      secondaryClip?.scale,
+      secondaryClip?.rotation,
+      secondaryClip?.flipHorizontal,
+      secondaryClip?.flipVertical,
+      secondaryClip?.offsetX,
+      secondaryClip?.offsetY,
+    ]
+  );
 
   // Aspect ratio styling (fills available flex height & width preserving ratio)
   const aspectRatioStyle = useMemo(() => {
@@ -611,116 +549,94 @@ export const CanvasPreview = memo(function CanvasPreview({
           style={aspectRatioStyle}
           className="relative max-w-full max-h-full flex items-center justify-center overflow-hidden bg-black select-none"
         >
-          {/* Active Transition or Active Single Clip or Timeline Gap */}
-          {activeTransition && fromAsset && toAsset && transStyles ? (
-            <>
-              {/* Incoming Clip B */}
-              <div
-                style={{
-                  ...transStyles.toWrapperStyle,
-                  transformOrigin: "center center",
-                  willChange: "transform, opacity, clip-path, filter",
-                }}
-                className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
-              >
-                {activeTransition.toClip.type === "video" ? (
-                  <video
-                    ref={secondaryVideoRef}
-                    playsInline
-                    muted={activeTransition.toClip.isMuted || isMasterMuted}
-                    style={{
-                      filter: getClipFilter(activeTransition.toClip),
-                      transform: getClipTransform(activeTransition.toClip),
-                      opacity: activeTransition.toClip.opacity ?? 1.0,
-                      transformOrigin: "center center",
-                    }}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={toAsset.objectUrl}
-                    alt={toAsset.name}
-                    style={{
-                      filter: getClipFilter(activeTransition.toClip),
-                      transform: getClipTransform(activeTransition.toClip),
-                      opacity: activeTransition.toClip.opacity ?? 1.0,
-                      transformOrigin: "center center",
-                    }}
-                    className="w-full h-full object-contain"
-                  />
-                )}
-              </div>
-
-              {/* Outgoing Clip A */}
-              <div
-                style={{
-                  ...transStyles.fromWrapperStyle,
-                  transformOrigin: "center center",
-                  willChange: "transform, opacity, clip-path, filter",
-                }}
-                className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
-              >
-                {activeTransition.fromClip.type === "video" ? (
-                  <video
-                    ref={videoRef}
-                    playsInline
-                    muted={activeTransition.fromClip.isMuted || isMasterMuted}
-                    style={{
-                      filter: getClipFilter(activeTransition.fromClip),
-                      transform: getClipTransform(activeTransition.fromClip),
-                      opacity: activeTransition.fromClip.opacity ?? 1.0,
-                      transformOrigin: "center center",
-                    }}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={fromAsset.objectUrl}
-                    alt={fromAsset.name}
-                    style={{
-                      filter: getClipFilter(activeTransition.fromClip),
-                      transform: getClipTransform(activeTransition.fromClip),
-                      opacity: activeTransition.fromClip.opacity ?? 1.0,
-                      transformOrigin: "center center",
-                    }}
-                    className="w-full h-full object-contain"
-                  />
-                )}
-              </div>
-            </>
-          ) : activeClipInfo && activeAsset ? (
-            activeClipInfo.clip.type === "video" ? (
-              <video
-                ref={videoRef}
-                playsInline
-                muted={activeClipInfo.clip.isMuted || isMasterMuted}
-                style={{
-                  filter: filterStyle,
-                  transform: transformStyle,
-                  opacity: activeClipInfo.clip.opacity ?? 1.0,
-                  willChange: "transform, filter",
-                  transformOrigin: "center center",
-                }}
-                className="w-full h-full object-contain pointer-events-none"
-              />
-            ) : (
+          {/* Layer 1: Outgoing or Primary Clip (Permanent DOM node) */}
+          <div
+            style={{
+              ...(activeTransition && transStyles ? transStyles.fromWrapperStyle : { zIndex: 1, opacity: 1 }),
+              display: primaryClip && primaryAsset ? "flex" : "none",
+              transformOrigin: "center center",
+              willChange: "transform, opacity, clip-path, filter",
+            }}
+            className="absolute inset-0 items-center justify-center pointer-events-none overflow-hidden"
+          >
+            <video
+              ref={videoRef}
+              src={primaryAsset?.type === "video" ? primaryAsset.objectUrl : undefined}
+              preload="auto"
+              playsInline
+              muted={primaryClip?.isMuted || isMasterMuted}
+              onLoadedData={handlePrimaryLoadedData}
+              style={{
+                filter: primaryFilter,
+                transform: primaryTransform,
+                opacity: primaryClip?.opacity ?? 1.0,
+                display: primaryClip?.type === "video" ? "block" : "none",
+                willChange: "transform, filter",
+                transformOrigin: "center center",
+              }}
+              className="w-full h-full object-contain"
+            />
+            {primaryClip?.type === "image" && primaryAsset && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={activeAsset.objectUrl}
-                alt={activeAsset.name}
+                src={primaryAsset.objectUrl}
+                alt=""
                 style={{
-                  filter: filterStyle,
-                  transform: transformStyle,
-                  opacity: activeClipInfo.clip.opacity ?? 1.0,
-                  willChange: "transform, filter",
+                  filter: primaryFilter,
+                  transform: primaryTransform,
+                  opacity: primaryClip.opacity ?? 1.0,
                   transformOrigin: "center center",
                 }}
-                className="w-full h-full object-contain pointer-events-none"
+                className="w-full h-full object-contain"
               />
-            )
-          ) : (
+            )}
+          </div>
+
+          {/* Layer 2: Incoming or Secondary Clip during Transitions (Permanent DOM node) */}
+          <div
+            style={{
+              ...(activeTransition && transStyles ? transStyles.toWrapperStyle : { zIndex: 2, opacity: 0 }),
+              display: activeTransition && secondaryClip && secondaryAsset ? "flex" : "none",
+              transformOrigin: "center center",
+              willChange: "transform, opacity, clip-path, filter",
+            }}
+            className="absolute inset-0 items-center justify-center pointer-events-none overflow-hidden"
+          >
+            <video
+              ref={secondaryVideoRef}
+              src={secondaryAsset?.type === "video" ? secondaryAsset.objectUrl : undefined}
+              preload="auto"
+              playsInline
+              muted={secondaryClip?.isMuted || isMasterMuted}
+              onLoadedData={handleSecondaryLoadedData}
+              style={{
+                filter: secondaryFilter,
+                transform: secondaryTransform,
+                opacity: secondaryClip?.opacity ?? 1.0,
+                display: secondaryClip?.type === "video" ? "block" : "none",
+                willChange: "transform, filter",
+                transformOrigin: "center center",
+              }}
+              className="w-full h-full object-contain"
+            />
+            {secondaryClip?.type === "image" && secondaryAsset && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={secondaryAsset.objectUrl}
+                alt=""
+                style={{
+                  filter: secondaryFilter,
+                  transform: secondaryTransform,
+                  opacity: secondaryClip.opacity ?? 1.0,
+                  transformOrigin: "center center",
+                }}
+                className="w-full h-full object-contain"
+              />
+            )}
+          </div>
+
+          {/* Empty Timeline Gap indicator */}
+          {!primaryClip && !activeTransition && (
             <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500 pointer-events-none">
               <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center mb-1.5 bg-white/[0.03]">
                 <div className="w-2 h-2 rounded-full bg-slate-600" />

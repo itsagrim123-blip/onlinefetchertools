@@ -175,6 +175,56 @@ describe("Video Editor Project State & Utilities", () => {
       expect(result.current.project.textLayers[0].text).toBe("Hello World");
       expect(result.current.project.textLayers[0].timelineStart).toBe(2.0);
     });
+
+    it("strictly prevents split clips or moved clips from overlapping adjacent clips", () => {
+      const { result } = renderHook(() => useProjectState());
+
+      act(() => {
+        const a1 = result.current.addAsset(dummyAsset.file, "video", 20.0);
+        result.current.addClipFromAsset(a1.id); // [0, 20]
+      });
+
+      const initialClipId = result.current.project.clips[0].id;
+
+      // Split at 8.0s -> clip1: [0, 8], clip2: [8, 20]
+      act(() => {
+        result.current.splitClipAtTime(8.0, initialClipId);
+      });
+
+      expect(result.current.project.clips).toHaveLength(2);
+      const clip1 = result.current.project.clips[0];
+      const clip2 = result.current.project.clips[1];
+      expect(clip1.timelineStart).toBe(0);
+      expect(clip2.timelineStart).toBe(8.0);
+
+      // Attempt to drag clip2 to 5.0s (into clip1)
+      act(() => {
+        result.current.moveClip(clip2.id, 5.0);
+      });
+
+      // Must be clamped to 8.0 (clip1 end), NEVER overlapping clip1!
+      expect(result.current.project.clips[1].timelineStart).toBe(8.0);
+
+      // Trimming clip1 end cannot push into clip2
+      act(() => {
+        result.current.trimClip(clip1.id, 0, 15.0);
+      });
+      // clip1 endTrim should be clamped so it doesn't exceed clip2's start (8.0s)
+      expect(result.current.project.clips[0].endTrim).toBeLessThanOrEqual(8.0);
+    });
+
+    it("auto-heals any overlapping clips in computeClipTimeRanges", () => {
+      // Create two clips that would overlap if not clamped
+      const rawClip1 = { ...createDefaultClip(dummyAsset), id: "c1", startTrim: 0, endTrim: 10, timelineStart: 0 };
+      const rawClip2 = { ...createDefaultClip(dummyAsset), id: "c2", startTrim: 0, endTrim: 10, timelineStart: 5 }; // overlaps c1 by 5s
+
+      const ranges = computeClipTimeRanges([rawClip1, rawClip2]);
+      expect(ranges[0].startTime).toBe(0);
+      expect(ranges[0].endTime).toBe(10);
+      // c2 MUST start at 10, not 5!
+      expect(ranges[1].startTime).toBe(10);
+      expect(ranges[1].endTime).toBe(20);
+    });
   });
 });
 

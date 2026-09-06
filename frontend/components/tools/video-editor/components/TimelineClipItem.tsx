@@ -20,6 +20,8 @@ interface TimelineClipItemProps {
   zoom: number; // pixels per second
   snapPoints?: number[];
   snapEnabled?: boolean;
+  minStartSec?: number;
+  maxStartSec?: number;
   onSelect: () => void;
   onMove: (newTimelineStart: number) => void;
   onTrim: (newStartTrim: number, newEndTrim: number, newTimelineStart?: number) => void;
@@ -52,6 +54,8 @@ export const TimelineClipItem = memo(function TimelineClipItem({
   zoom,
   snapPoints = [],
   snapEnabled = true,
+  minStartSec = 0,
+  maxStartSec = Infinity,
   onSelect,
   onMove,
   onTrim,
@@ -93,19 +97,29 @@ export const TimelineClipItem = memo(function TimelineClipItem({
 
       if (trimmingSide === "start") {
         const deltaSec = (deltaPx / zoom) * speed;
+        // Don't allow start trim to expand earlier than the previous clip
+        const maxShift = Math.max(0, initialTimelineStartRef.current - minStartSec);
+        const maxSourceShift = maxShift * speed;
+        const minAllowedStart = Math.max(0, initialStartTrimRef.current - maxSourceShift);
         const newStart = Math.max(
-          0,
+          minAllowedStart,
           Math.min(initialStartTrimRef.current + deltaSec, initialEndTrimRef.current - 0.2)
         );
         const actualSourceDelta = newStart - initialStartTrimRef.current;
         const timelineShift = actualSourceDelta / speed;
-        const newTimelineStart = Math.max(0, initialTimelineStartRef.current + timelineShift);
+        const newTimelineStart = Math.max(minStartSec, initialTimelineStartRef.current + timelineShift);
         onTrim(newStart, initialEndTrimRef.current, newTimelineStart);
       } else if (trimmingSide === "end") {
         const deltaSec = (deltaPx / zoom) * speed;
+        // Don't allow end trim to expand into the next clip
+        const maxAllowedDuration =
+          maxStartSec === Infinity
+            ? clip.sourceDuration
+            : Math.max(0.2, maxStartSec + effectiveDuration - clipStartSec);
+        const maxAllowedEnd = initialStartTrimRef.current + maxAllowedDuration * speed;
         const newEnd = Math.max(
           initialStartTrimRef.current + 0.2,
-          Math.min(initialEndTrimRef.current + deltaSec, clip.sourceDuration)
+          Math.min(initialEndTrimRef.current + deltaSec, clip.sourceDuration, maxAllowedEnd)
         );
         onTrim(initialStartTrimRef.current, newEnd);
       }
@@ -126,7 +140,17 @@ export const TimelineClipItem = memo(function TimelineClipItem({
       window.removeEventListener("touchmove", handlePointerMove);
       window.removeEventListener("touchend", handlePointerUp);
     };
-  }, [trimmingSide, zoom, clip.speed, clip.sourceDuration, onTrim]);
+  }, [
+    trimmingSide,
+    zoom,
+    clip.speed,
+    clip.sourceDuration,
+    effectiveDuration,
+    clipStartSec,
+    minStartSec,
+    maxStartSec,
+    onTrim,
+  ]);
 
   // Body Dragging Handlers
   const handleBodyPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -158,17 +182,24 @@ export const TimelineClipItem = memo(function TimelineClipItem({
 
     if (hasMovedRef.current) {
       const deltaSec = dragOffsetPx / zoom;
-      const rawStart = Math.max(0, clipStartSec + deltaSec);
+      const rawStart = clipStartSec + deltaSec;
+      const clampedRawStart = Math.max(minStartSec, Math.min(maxStartSec, rawStart));
       const otherSnapPoints = snapPoints.filter((p) => Math.abs(p - clipStartSec) > 0.05);
-      const snapped = calculateSnapped(rawStart, otherSnapPoints, 12 / zoom, snapEnabled);
-      onMove(snapped);
+      const snapTargets = [...otherSnapPoints, minStartSec];
+      if (maxStartSec !== Infinity) snapTargets.push(maxStartSec);
+      const snapped = calculateSnapped(clampedRawStart, snapTargets, 12 / zoom, snapEnabled);
+      const finalStart = Math.max(minStartSec, Math.min(maxStartSec, snapped));
+      onMove(finalStart);
     } else {
       onSelect();
     }
     setDragOffsetPx(0);
   };
 
-  const displayedLeftPx = Math.max(0, clipStartSec * zoom + (isDraggingBody ? dragOffsetPx : 0));
+  const minLeftPx = minStartSec * zoom;
+  const maxLeftPx = maxStartSec === Infinity ? Infinity : maxStartSec * zoom;
+  const rawLeftPx = clipStartSec * zoom + (isDraggingBody ? dragOffsetPx : 0);
+  const displayedLeftPx = Math.max(minLeftPx, Math.min(maxLeftPx, rawLeftPx));
 
   return (
     <div
